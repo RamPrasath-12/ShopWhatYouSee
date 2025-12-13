@@ -1,17 +1,14 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
 import base64, cv2, numpy as np
-
 from models.yolo_detector import YoloDetector
 from config import YOLO_WEIGHTS, YOLO_CONF_THRESH
 from models.agman_extractor import process_crop_base64
 from models.scene_context import SceneContextDetector
 from models.llm_reasoner import LLMReasoner
 from flask_cors import CORS,cross_origin
-from flask import Flask, request, jsonify
 import psycopg2
 from models.product_retrieval import search_products
-from flask import send_from_directory
+from flask import Flask, request, jsonify, send_from_directory
+import os
 
 
 def get_db():
@@ -24,11 +21,11 @@ def get_db():
 
 
 
-
-
-
-
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    static_folder="static",
+    static_url_path="/static"
+)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 scene_detector = SceneContextDetector()
