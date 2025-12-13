@@ -1,0 +1,12 @@
+flask
+flask-cors
+ultralytics
+torch
+torchvision
+opencv-python-headless
+numpy
+pillow
+tensorflow
+scikit-learn
+faiss-cpu   # optional; if fails, skip and use sklearn
+psycopg2-binary  # if using PostgreSQL (optional)
