@@ -249,222 +249,107 @@
 
 
 
-
-
 # backend/models/llm_reasoner.py
-import os
+# backend/models/llm_reasoner.py
 import re
 import json
+import math
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM  # or Seq2Seq if you used that
-# if you're using flan-t5: use AutoModelForSeq2SeqLM and Tokenizer; if qwen causal: use AutoModelForCausalLM
-# adjust imports to match the model you actually loaded in your environment.
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+CANONICAL_COLORS = {
+    "black": (0,0,0),
+    "white": (255,255,255),
+    "red": (220,20,60),
+    "blue": (30,144,255),
+    "green": (34,139,34),
+    "yellow": (255,215,0),
+    "pink": (255,105,180),
+    "brown": (139,69,19),
+    "grey": (128,128,128),
+    "navy": (0,0,128),
+    "beige": (245,245,220),
+    "maroon": (128,0,0),
+    "olive": (128,128,0),
+    "purple": (128,0,128),
+    "teal": (0,128,128),
+    "cream": (255,253,208),
+}
+VALID_COLORS = set(CANONICAL_COLORS.keys())
 
 class LLMReasoner:
-    def __init__(self, model_name="google/flan-t5-small", cache_dir="D:/huggingface_cache"):
-        os.environ["HF_HOME"] = cache_dir
-        os.environ["TRANSFORMERS_CACHE"] = cache_dir
+    def __init__(self, model_name="google/flan-t5-small"):
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+        self.model.to("cpu").eval()
+        self.style_words = {"formal","casual","party","office","ethnic","sports"}
 
-        self.model_name = model_name
-        print(f"[LLMReasoner] Loading model: {self.model_name}")
-        # If your model is Seq2Seq (flan-t5)
-        try:
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-            # try seq2seq first (works for flan-t5)
-            from transformers import AutoModelForSeq2SeqLM
-            self.model = AutoModelForSeq2SeqLM.from_pretrained(self.model_name, device_map="auto")
-            self.model_type = "seq2seq"
-        except Exception:
-            # fallback: load causal (for qwen-like)
-            from transformers import AutoModelForCausalLM
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, trust_remote_code=True)
-            self.model = AutoModelForCausalLM.from_pretrained(self.model_name, trust_remote_code=True, device_map="auto")
-            self.model_type = "causal"
+    def hex_to_color(self, hexcode):
+     if not hexcode or not hexcode.startswith("#"):
+        return None
 
-        if not torch.cuda.is_available():
-            # ensure model on CPU to avoid device issues
-            self.model.to("cpu")
+     try:
+        r = int(hexcode[1:3], 16)
+        g = int(hexcode[3:5], 16)
+        b = int(hexcode[5:7], 16)
+     except:
+        return None
 
-        print("[LLMReasoner] Model loaded (or attempted). model_type:", self.model_type)
+     best, min_dist = None, float("inf")
+     for name, (cr, cg, cb) in CANONICAL_COLORS.items():
+        dist = math.sqrt((r-cr)**2 + (g-cg)**2 + (b-cb)**2)
+        if dist < min_dist:
+            min_dist = dist
+            best = name
 
-        # small dictionaries for rule-based fallback
-        self.color_words = set([
-            "red","blue","green","black","white","yellow","brown","pink","purple","orange","gray","grey","beige","navy"
-        ])
-        self.style_words = set(["formal","casual","party","ethnic","sports","business","smart","street"])
-        self.pattern_words = set(["striped","checked","checked","plaid","solid","patterned","floral"])
-        self.sleeve_words = {
-            "short": ["short","shortsleeve","short-sleeve"],
-            "long": ["long","longsleeve","long-sleeve"],
-            "three_quarter": ["three_quarter","three-quarter","3/4","three quarter"]
-        }
+    # 🔒 HARD THRESHOLD
+    # if too far → keep as maroon family instead of black
+     if min_dist > 120:
+        return "maroon"
 
-    def hex_to_color_name(self, hexcode):
-        # simple approximate mapping: returns a basic family name
-        if not hexcode or len(hexcode) < 7:
-            return None
-        try:
-            r = int(hexcode[1:3], 16)
-            g = int(hexcode[3:5], 16)
-            b = int(hexcode[5:7], 16)
-        except:
-            return None
-        if r > g and r > b: return "red"
-        if g > r and g > b: return "green"
-        if b > r and b > g: return "blue"
-        if r > 200 and g > 200 and b < 150: return "yellow"
-        if r > 120 and g > 80 and b < 60: return "brown"
-        return "neutral"
+     return best
 
-    def clean_json(self, text):
-        if not text:
-            return None
-        text = text.replace("```json", "").replace("```", "").strip()
-        # find first JSON block
-        m = re.search(r"\{[\s\S]*\}", text)
-        if not m:
-            return None
-        try:
-            return json.loads(m.group(0))
-        except Exception:
-            # sometimes the model writes keys without quotes; try to patch naive mistakes
-            s = m.group(0)
-            # add quotes around property names (very naive)
-            s2 = re.sub(r'(\b[a-zA-Z_]+\b)\s*:', r'"\1":', s)
-            try:
-                return json.loads(s2)
-            except Exception:
-                return None
 
-    # ---------- rule-based fallback ----------
-    def rule_based_filters(self, item, scene_label, user_query):
-        # item: dict containing attributes (color_hex, pattern, sleeve_length)
-        # returns dictionary with filters
-        color = None
-        if item.get("color_hex"):
-            color = self.hex_to_color_name(item.get("color_hex"))
-        # attempt to get color from user_query first if explicit
-        if user_query:
-            q = user_query.lower()
-            # color words
-            for cw in self.color_words:
-                if re.search(r'\b' + re.escape(cw) + r'\b', q):
-                    color = cw
-                    break
+    def extract_price(self, q):
+        if not q: return None
+        m = re.search(r'(under|less than|below|<)\s*₹?\s*(\d+)', q.lower())
+        return int(m.group(2)) if m else None
 
-        pattern = item.get("pattern") or None
-        if user_query:
-            for p in self.pattern_words:
-                if re.search(r'\b' + re.escape(p) + r'\b', user_query.lower()):
-                    pattern = p
-                    break
-
-        sleeve = item.get("sleeve_length") or None
-        if user_query:
-            for k,vlist in self.sleeve_words.items():
-                for token in vlist:
-                    if token in user_query.lower():
-                        sleeve = k
-                        break
-                if sleeve:
-                    break
-
-        # style detection
-        style = None
-        if user_query:
-            for sw in self.style_words:
-                if re.search(r'\b' + re.escape(sw) + r'\b', user_query.lower()):
-                    style = sw
-                    break
-        # price extraction
-        price_max = None
-        if user_query:
-            # common patterns: "under 1000", "less than 1000", "below 1000", "price < 1000"
-            m = re.search(r'(?:under|less than|below|<|price under|price less than)\s*₹?\s*([0-9]{2,6})', user_query.lower())
-            if not m:
-                # match a bare number if prefixed by "less" or "under"
-                m = re.search(r'(?:under|less than|below)\s*([0-9]{2,6})', user_query.lower())
-            if m:
-                try:
-                    price_max = float(m.group(1))
-                except:
-                    price_max = None
-            else:
-                # also match "1000 rupees" or "1000"
-                m2 = re.search(r'([0-9]{2,6})', user_query)
-                if m2:
-                    # only accept if user used "price", "rupee", "₹", "under", etc.
-                    if re.search(r'price|₹|rupee|rs|under|less than|below', user_query.lower()):
-                        try:
-                            price_max = float(m2.group(1))
-                        except:
-                            price_max = None
-
-        # scene-based adjustments (example): if scene suggests "beach", deprioritize heavy coats — we keep as context only
-        # for fallback, we won't change style automatically but you can map scene to style suggestions:
-        if not style and scene_label:
-            if scene_label.lower() in ("beach","outdoor","pool"):
-                # if user asked 'formal' but scene is beach, you might warn — but here keep style None
-                pass
-
-        return {
-            "filters": {
-                "color": color,
-                "pattern": pattern,
-                "sleeve_length": sleeve,
-                "style": style,
-                "price_max": price_max
-            }
-        }
-
-    # ---------- main: try LLM then fallback ----------
-    def generate_filters(self, item, scene_label, user_query):
-        # Build minimal prompt (avoid very long prompt)
-        color_w = self.hex_to_color_name(item.get("color_hex", "")) or "unknown"
-        pattern = item.get("pattern") or "unknown"
-        sleeve = item.get("sleeve_length") or "unknown"
-
+    def call_llm(self, q):
+        if not q: return {}
         prompt = (
-            f"Item color: {color_w}\n"
-            f"Pattern: {pattern}\n"
-            f"Sleeve: {sleeve}\n"
-            f"Scene: {scene_label}\n"
-            f"User request: {user_query}\n\n"
-            "Return ONLY valid JSON with keys: filters -> color, pattern, sleeve_length, style, price_max. "
-            "If nothing, use null."
+            "Extract ONLY style from user request.\n"
+            "Return JSON: {\"style\": null | formal | casual | party | office | ethnic | sports}\n\n"
+            f"User: {q}"
         )
-
+        inputs = self.tokenizer(prompt, return_tensors="pt")
+        with torch.no_grad():
+            out = self.model.generate(**inputs, max_new_tokens=40)
+        txt = self.tokenizer.decode(out[0], skip_special_tokens=True)
         try:
-            # prepare tokens depending on model type
-            inputs = self.tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512).to(self.model.device)
-            with torch.no_grad():
-                if getattr(self, "model_type", None) == "seq2seq":
-                    outputs = self.model.generate(**inputs, max_new_tokens=80, do_sample=False, num_beams=2)
-                    raw = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-                else:
-                    # causal LM – produce by just encoding prompt and generating
-                    input_ids = inputs["input_ids"]
-                    outputs = self.model.generate(input_ids=input_ids, max_new_tokens=80, do_sample=False, temperature=0.1)
-                    raw = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-            raw = raw.strip()
-            print("[LLMReasoner] RAW LLM OUTPUT:\n", raw)
-            parsed = self.clean_json(raw)
-            # if parsed is None or has all nulls: run fallback
-            if parsed is None:
-                print("[LLMReasoner] LLM parsing failed, using rule-based fallback.")
-                return self.rule_based_filters(item, scene_label, user_query)
-            # validate parsed structure
-            if "filters" not in parsed or not isinstance(parsed["filters"], dict):
-                print("[LLMReasoner] LLM output missing filters key; fallback.")
-                return self.rule_based_filters(item, scene_label, user_query)
-            # check if all are null
-            f = parsed["filters"]
-            non_null_exists = any(v is not None for v in f.values())
-            if not non_null_exists:
-                print("[LLMReasoner] LLM returned all nulls; fallback.")
-                return self.rule_based_filters(item, scene_label, user_query)
-            return parsed
-        except Exception as e:
-            print("[LLMReasoner] Exception during LLM call:", e)
-            print("[LLMReasoner] Using rule-based fallback.")
-            return self.rule_based_filters(item, scene_label, user_query)
+            return json.loads(re.search(r"\{.*\}", txt, re.S).group())
+        except:
+            return {}
+
+    def generate_filters(self, item, scene, user_query):
+        # AG-MAN is ground truth
+        filters = {
+            "color": self.hex_to_color(item.get("color_hex")),
+            "pattern": item.get("pattern"),
+            "sleeve_length": item.get("sleeve_length"),
+            "style": None,
+            "price_max": self.extract_price(user_query)
+        }
+
+        # LLM only for style
+        llm = self.call_llm(user_query)
+        if llm.get("style") in self.style_words:
+            filters["style"] = llm["style"]
+
+        # USER OVERRIDE COLOR
+        for c in VALID_COLORS:
+            if user_query and re.search(rf"\b{c}\b", user_query.lower()):
+                filters["color"] = c
+                break
+
+        return {"filters": filters}

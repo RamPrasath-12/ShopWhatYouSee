@@ -5,49 +5,57 @@ def get_db():
         host="localhost",
         database="shopwhatyousee",
         user="postgres",
-        password="postgres123@"   # change if needed
+        password="postgres123@"
     )
+    
+def normalize_category(cat):
+    if not cat:
+        return None
+    cat = cat.lower()
+    mapping = {
+        "short": "shorts",
+        "tee": "t-shirt",
+        "tshirt": "t-shirt"
+    }
+    return mapping.get(cat, cat)
+    
 
 def search_products(filters):
+    category = normalize_category(filters.get("category"))
+    if not filters.get("category"):
+        return []
+
+    conn = get_db()
+    cur = conn.cursor()
+
     query = """
-    SELECT id, name, price, image_url
-    FROM products
-    WHERE 1=1
+        SELECT id, name, price, image_url
+        FROM products
+        WHERE category = %s
     """
-    params = []
+    params = [category]
 
-    if filters.get("color"):
-        query += " AND color = %s"
-        params.append(filters["color"])
 
-    if filters.get("pattern"):
-        query += " AND pattern = %s"
-        params.append(filters["pattern"])
-
-    if filters.get("style"):
-        query += " AND style = %s"
-        params.append(filters["style"])
+    for k in ["color","pattern","style"]:
+        if filters.get(k):
+            query += f" AND {k} = %s"
+            params.append(filters[k])
 
     if filters.get("price_max"):
         query += " AND price <= %s"
         params.append(filters["price_max"])
 
-    query += " LIMIT 20"
+    query += " ORDER BY price ASC LIMIT 20"
 
-    conn = get_db()
-    cur = conn.cursor()
     cur.execute(query, params)
     rows = cur.fetchall()
     cur.close()
     conn.close()
 
-    results = []
-    for r in rows:
-        results.append({
-            "id": r[0],
-            "name": r[1],
-            "price": r[2],
-            "image_url": r[3]   # <-- already stored in DB
-        })
+    return [{
+        "id": r[0],
+        "name": r[1],
+        "price": float(r[2]),
+        "image_url": f"http://localhost:5000{r[3]}"
 
-    return results
+    } for r in rows]

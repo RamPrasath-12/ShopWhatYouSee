@@ -8,6 +8,7 @@ from flask_cors import CORS,cross_origin
 import psycopg2
 from models.product_retrieval import search_products
 from flask import Flask, request, jsonify, send_from_directory
+from utils.color_utils import hex_to_color_name
 import os
 
 
@@ -77,24 +78,54 @@ def scene():
         return jsonify({"error":"no frame provided"}), 400
     result = scene_detector.infer(b64)
     return jsonify(result)
-
-
-@app.route('/llm', methods=['POST'])
+@app.route("/llm", methods=["POST"])
 def llm_route():
     body = request.get_json() or {}
-    item = body.get("item", {})                # { color_hex, pattern, sleeve_length }
-    scene_label = body.get("scene_label", None)
-    user_query = body.get("user_query", "")    # string
-    result = llm.generate_filters(item, scene_label, user_query)
-    # ensure response is JSON-serializable
-    return jsonify(result)
+
+    item = body.get("item", {})
+    scene = body.get("scene")          # ✅ FULL SCENE OBJECT
+    user_query = body.get("user_query")
+
+    try:
+        result = llm.generate_filters(
+            item=item,
+            scene=scene,
+            user_query=user_query
+        )
+
+        return jsonify(result)
+
+    except Exception as e:
+        print("❌ LLM ROUTE ERROR:", e)
+        print("Item:", item)
+        print("Scene:", scene)
+        print("Query:", user_query)
+
+        # SAFE fallback (still valid JSON)
+        return jsonify({
+            "filters": {
+                "category": item.get("category"),
+                "color": None,
+                "pattern": item.get("pattern"),
+                "sleeve_length": item.get("sleeve_length"),
+                "style": None,
+                "price_max": None
+            },
+            "llm_error": str(e)
+        }), 200
+
 
 @app.route("/search", methods=["POST"])
 def search_api():
-    filters = request.json
+    body = request.get_json()
+    filters = body.get("filters", {})
+
+    # 🔥 FORCE category from selected detection
+    if "category" not in filters:
+        filters["category"] = body.get("detected_category")
+
     products = search_products(filters)
     return jsonify({"products": products})
-
 
 
 

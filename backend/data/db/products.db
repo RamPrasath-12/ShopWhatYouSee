@@ -1,12 +1,14 @@
 -- Connect to shopwhatyousee database
-
-CREATE TABLE IF NOT EXISTS products (
-  id SERIAL PRIMARY KEY,
-  name VARCHAR(255),
-  color VARCHAR(50),
-  pattern VARCHAR(50),
-  sleeve_length VARCHAR(50),
-  style VARCHAR(50),
-  price NUMERIC(10,2),
-  image_url TEXT
+CREATE TABLE products (
+    id SERIAL PRIMARY KEY,
+    name TEXT,
+    category TEXT,
+    gender TEXT,
+    color TEXT,
+    pattern TEXT,
+    style TEXT,
+    price INTEGER,
+    image_url TEXT
 );
+select *from products;
+SELECT COUNT(*) FROM products;
