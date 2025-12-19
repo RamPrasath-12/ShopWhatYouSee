@@ -1,12 +1,36 @@
-flask
-flask-cors
-ultralytics
-torch
-torchvision
-opencv-python-headless
-numpy
-pillow
-tensorflow
-scikit-learn
-faiss-cpu   # optional; if fails, skip and use sklearn
-psycopg2-binary  # if using PostgreSQL (optional)
+# Core web
+flask>=2.2.5
+flask-cors>=3.0.10
+
+# Computer vision / detection
+ultralytics>=8.0.20
+opencv-python-headless>=4.7.0
+
+# PyTorch (used by many model scripts)
+torch>=2.0.1
+torchvision>=0.15.2
+
+# TensorFlow (used by feature extractor using keras)
+tensorflow>=2.12.0
+
+# ML / embeddings / clustering
+numpy>=1.24.0
+scikit-learn>=1.2.2
+faiss-cpu>=1.7.4 ; platform_system != 'Windows'
+# Note: prebuilt faiss binaries for Windows are not always available via pip.
+# On Windows, install faiss via conda or omit if unavailable.
+
+# Transformers / LLM
+transformers>=4.33.2
+
+# Utilities
+pillow>=9.4.0
+pandas>=2.0.3
+tqdm>=4.65.0
+psycopg2-binary>=2.9.6
+python-dotenv>=1.0.0
+
+# Optional / Deployment
+gunicorn>=20.1.0
+
+# Pin exact versions as needed for reproducibility in production.
