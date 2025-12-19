@@ -122,7 +122,7 @@ def evaluate_latency():
     # -----------------------------
     # REPORT
     # -----------------------------
-    print("===== LATENCY METRICS (REVIEW-1) =====")
+    print("===== LATENCY METRICS =====")
     print(f"YOLO Detection        : {(t1 - t0) * 1000:.2f} ms")
     print(f"AG-MAN Extraction     : {(t3 - t2) * 1000:.2f} ms")
     print(f"Scene Context         : {(t5 - t4) * 1000:.2f} ms")

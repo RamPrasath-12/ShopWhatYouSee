@@ -33,7 +33,7 @@ MODEL_PATH = os.path.abspath(
 
 # Use a saved frame from your video pipeline
 TEST_IMAGE_PATH = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "sample_frame.jfif")
+    os.path.join(os.path.dirname(__file__), "sample_frame.jpg")
 )
 
 RUNS = 5   # number of repeated inferences
@@ -96,7 +96,7 @@ for i in range(RUNS):
 # SUMMARY STATISTICS
 # -----------------------------
 
-print("\n===== YOLOv8 INFERENCE METRICS (REVIEW-1) =====")
+print("\n===== YOLOv8 INFERENCE METRICS =====")
 print(f"Model Used            : {os.path.basename(MODEL_PATH)}")
 print(f"Test Image Resolution : {frame.shape[1]}x{frame.shape[0]}")
 print(f"Average Inference Time: {np.mean(inference_times):.2f} ms")

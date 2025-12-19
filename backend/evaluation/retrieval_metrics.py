@@ -94,7 +94,7 @@ def evaluate_retrieval():
 
     top_k_available = min(TOP_K, len(rows))
 
-    print("\n===== RETRIEVAL METRICS (REVIEW-1) =====")
+    print("\n===== RETRIEVAL METRICS =====")
     print(f"Category               : {QUERY_FILTERS['category']}")
     print(f"Applied Filters        : pattern, style, price")
     print(f"Products Retrieved     : {len(rows)}")

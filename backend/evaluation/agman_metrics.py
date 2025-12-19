@@ -97,7 +97,7 @@ def evaluate_agman():
     # -----------------------------
     # SUMMARY
     # -----------------------------
-    print("\n===== AG-MAN METRICS (REVIEW-1) =====")
+    print("\n===== AG-MAN METRICS =====")
     print(f"Embedding Dimension      : {embeddings.shape[1]}")
     print(f"Avg Inference Time (ms)  : {np.mean(inference_times):.2f}")
     print(f"Min Inference Time (ms)  : {np.min(inference_times):.2f}")
