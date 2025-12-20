@@ -1,12 +1,49 @@
-flask
-flask-cors
-ultralytics
-torch
-torchvision
-opencv-python-headless
-numpy
-pillow
-tensorflow
-scikit-learn
-faiss-cpu   # optional; if fails, skip and use sklearn
-psycopg2-binary  # if using PostgreSQL (optional)
+
+# Core Web Framework & API
+flask>=2.3.0
+flask-cors>=4.0.0
+werkzeug>=2.3.0
+gunicorn>=21.0.0
+
+# Computer Vision & Detection
+ultralytics>=8.0.0
+opencv-python-headless>=4.8.0
+pillow>=9.5.0
+
+# Deep Learning - PyTorch Ecosystem
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Deep Learning - TensorFlow/Keras
+tensorflow>=2.12.0
+transformers>=4.33.0
+
+# ML / Data Processing / Embeddings
+numpy>=1.24.0
+scipy>=1.10.0
+scikit-learn>=1.3.0
+pandas>=2.0.0
+faiss-cpu>=1.7.4 ; platform_system != 'Windows'
+
+# Database Access
+psycopg2-binary>=2.9.0
+sqlalchemy>=2.0.0
+
+# Utilities & Configuration
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+pyyaml>=6.0
+requests>=2.31.0
+tqdm>=4.65.0
+
+# Evaluation & Visualization (for notebooks/analysis)
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Logging (optional)
+python-logging-loki>=0.3.2
+
+# Development & Testing (optional)
+pytest>=7.4.0
+black>=23.0.0
+flake8>=6.0.0
