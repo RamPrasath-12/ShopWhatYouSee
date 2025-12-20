@@ -147,54 +147,79 @@ function VideoPlayer() {
   // =================================================
   // MODULE 5: LLM INTENT REASONING
   // =================================================
-  const sendToLLM = async () => {
-    if (!selectedItem || !attributes) {
-      alert("Select an item first");
-      return;
-    }
+ 
+const sendToLLM = async () => {
+  if (!selectedItem || !attributes) {
+    alert("Select an item first");
+    return;
+  }
 
-   const payload = {
-  item: {
-    category: selectedItem.class.toLowerCase(),
-    color_hex: attributes.color_hex,
-    pattern: attributes.pattern,
-    sleeve_length: attributes.sleeve_length
-  },
-  scene: scene || null,          // ✅ FULL OBJECT
-  user_query: userText.trim() || null
-};
+  // AUTO MODE if input empty
+  const query =
+    userText && userText.trim().length > 0
+      ? userText.trim()
+      : null;
 
-
-    try {
-      const res = await axios.post("http://localhost:5000/llm", payload);
-      setLlmOutput(res.data);
-    } catch (err) {
-      console.error("LLM ERROR:", err);
-      alert("LLM failed");
-    }
+  const payload = {
+    item: {
+      category: selectedItem.class.toLowerCase(), // 🔒 YOLO ground truth
+      color_hex: attributes.color_hex,
+      pattern: attributes.pattern,
+      sleeve_length: attributes.sleeve_length
+    },
+    scene: scene || null,        // full scene object
+    user_query: query            // null → AUTO MODE
   };
+
+  try {
+    const res = await axios.post(
+      "http://localhost:5000/llm",
+      payload
+    );
+
+    console.log("LLM OUTPUT:", res.data);
+    setLlmOutput(res.data);
+
+  } catch (err) {
+    console.error("LLM ERROR:", err);
+    alert("LLM failed");
+  }
+};
 
   // =================================================
   // MODULE 6: PRODUCT RETRIEVAL
   // =================================================
-  const searchProducts = async () => {
-    if (!selectedItem) {
-      alert("Select an item first");
-      return;
-    }
+  
+const searchProducts = async () => {
+  if (!selectedItem) {
+    alert("Select an item first");
+    return;
+  }
 
-    const payload = {
-      filters: llmOutput?.filters || {},
-      detected_category: selectedItem.class.toLowerCase()
-    };
+  if (!llmOutput || !llmOutput.filters) {
+    alert("Generate filters using LLM first");
+    return;
+  }
 
-    try {
-      const res = await axios.post("http://localhost:5000/search", payload);
-      setProducts(res.data.products || []);
-    } catch (err) {
-      console.error("PRODUCT SEARCH ERROR:", err);
-    }
+  const payload = {
+    filters: llmOutput.filters,              // 🔥 LLM decides
+    detected_category: selectedItem.class.toLowerCase()
   };
+
+  console.log("SEARCH PAYLOAD:", payload);
+
+  try {
+    const res = await axios.post(
+      "http://localhost:5000/search",
+      payload
+    );
+
+    setProducts(res.data.products || []);
+
+  } catch (err) {
+    console.error("PRODUCT SEARCH ERROR:", err);
+  }
+};
 
   // =================================================
   // UI
@@ -357,12 +382,17 @@ function VideoPlayer() {
             border: "1px solid #ccc"
           }}
         />
+        {/* text for llm */}
+        <p style={{ fontSize: "12px", color: "#555", marginTop: "4px" }}>
+  Leave empty to let AI infer style from visual attributes and scene context.
+</p>
+
 
         <br />
         <br />
 
         <button style={buttonStyle} onClick={sendToLLM}>
-          Generate Filters
+          Reason & Generate Filters
         </button>
 
         {llmOutput && (
@@ -409,16 +439,17 @@ function VideoPlayer() {
       </div>
     )}
 
-    {selectedItem && (
-      <div style={{ marginTop: "15px" }}>
-        <button
-          style={{ ...buttonStyle, background: "#ff5722" }}
-          onClick={searchProducts}
-        >
-          Search Products
-        </button>
-      </div>
-    )}
+   {llmOutput && (
+  <div style={{ marginTop: "15px" }}>
+    <button
+      style={{ ...buttonStyle, background: "#ff5722" }}
+      onClick={searchProducts}
+    >
+      Retrieve Matching Products
+    </button>
+  </div>
+ )}
+
   </div>
 );
 }

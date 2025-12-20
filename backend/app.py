@@ -78,20 +78,37 @@ def scene():
         return jsonify({"error":"no frame provided"}), 400
     result = scene_detector.infer(b64)
     return jsonify(result)
+# --------------------------------------------------
+# LLM INTENT REASONING ROUTE
+# --------------------------------------------------
 @app.route("/llm", methods=["POST"])
 def llm_route():
     body = request.get_json() or {}
 
     item = body.get("item", {})
-    scene = body.get("scene")          # ✅ FULL SCENE OBJECT
-    user_query = body.get("user_query")
+    scene = body.get("scene")              # full scene object
+    user_query = body.get("user_query")    # may be None / ""
+
+    # 🔒 Category is ALWAYS locked (YOLO ground truth)
+    category = item.get("category")
 
     try:
+        # -----------------------------
+        # Call LLM reasoner
+        # -----------------------------
         result = llm.generate_filters(
             item=item,
             scene=scene,
             user_query=user_query
         )
+
+        # -----------------------------
+        # Enforce category (non-negotiable)
+        # -----------------------------
+        if "filters" not in result:
+            result["filters"] = {}
+
+        result["filters"]["category"] = category
 
         return jsonify(result)
 
@@ -101,10 +118,12 @@ def llm_route():
         print("Scene:", scene)
         print("Query:", user_query)
 
-        # SAFE fallback (still valid JSON)
+        # -----------------------------
+        # SAFE FALLBACK (still usable)
+        # -----------------------------
         return jsonify({
             "filters": {
-                "category": item.get("category"),
+                "category": category,
                 "color": None,
                 "pattern": item.get("pattern"),
                 "sleeve_length": item.get("sleeve_length"),
@@ -115,19 +134,41 @@ def llm_route():
         }), 200
 
 
+# --------------------------------------------------
+# PRODUCT RETRIEVAL ROUTE
+# --------------------------------------------------
 @app.route("/search", methods=["POST"])
 def search_api():
-    body = request.get_json()
+    body = request.get_json() or {}
+
     filters = body.get("filters", {})
+    detected_category = body.get("detected_category")
 
-    # 🔥 FORCE category from selected detection
-    if "category" not in filters:
-        filters["category"] = body.get("detected_category")
+    # 🔒 Category enforcement (FINAL GUARANTEE)
+    if not filters.get("category"):
+        filters["category"] = detected_category
 
-    products = search_products(filters)
-    return jsonify({"products": products})
+    # -----------------------------
+    # Sanity cleanup (avoid junk)
+    # -----------------------------
+    clean_filters = {
+        k: v for k, v in filters.items()
+        if v is not None and v != ""
+    }
+
+    # -----------------------------
+    # Search using progressive retrieval
+    # -----------------------------
+    products = search_products(clean_filters)
+
+    return jsonify({
+        "products": products,
+        "applied_filters": clean_filters
+    })
 
 
-
+# --------------------------------------------------
+# APP ENTRY
+# --------------------------------------------------
 if __name__ == "__main__":
-  app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)

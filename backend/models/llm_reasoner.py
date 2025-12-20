@@ -251,105 +251,181 @@
 
 # backend/models/llm_reasoner.py
 # backend/models/llm_reasoner.py
+
 import re
 import json
 import math
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
+
+# --------------------------------------------------
+# Canonical color space (limited, explainable)
+# --------------------------------------------------
 CANONICAL_COLORS = {
-    "black": (0,0,0),
-    "white": (255,255,255),
-    "red": (220,20,60),
-    "blue": (30,144,255),
-    "green": (34,139,34),
-    "yellow": (255,215,0),
-    "pink": (255,105,180),
-    "brown": (139,69,19),
-    "grey": (128,128,128),
-    "navy": (0,0,128),
-    "beige": (245,245,220),
-    "maroon": (128,0,0),
-    "olive": (128,128,0),
-    "purple": (128,0,128),
-    "teal": (0,128,128),
-    "cream": (255,253,208),
+    "black": (0, 0, 0),
+    "white": (255, 255, 255),
+    "red": (220, 20, 60),
+    "blue": (30, 144, 255),
+    "green": (34, 139, 34),
+    "yellow": (255, 215, 0),
+    "pink": (255, 105, 180),
+    "brown": (139, 69, 19),
+    "grey": (128, 128, 128),
+    "navy": (0, 0, 128),
+    "beige": (245, 245, 220),
+    "maroon": (128, 0, 0),
+    "olive": (128, 128, 0),
+    "purple": (128, 0, 128),
+    "teal": (0, 128, 128),
+    "cream": (255, 253, 208),
 }
+
 VALID_COLORS = set(CANONICAL_COLORS.keys())
 
+
+# ==================================================
+# LLM Reasoner
+# ==================================================
 class LLMReasoner:
     def __init__(self, model_name="google/flan-t5-small"):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
         self.model.to("cpu").eval()
-        self.style_words = {"formal","casual","party","office","ethnic","sports"}
 
+        self.style_words = {
+            "formal", "casual", "party", "office", "ethnic", "sports"
+        }
+
+
+    # --------------------------------------------------
+    # HEX → nearest canonical color
+    # --------------------------------------------------
     def hex_to_color(self, hexcode):
-     if not hexcode or not hexcode.startswith("#"):
-        return None
+        if not hexcode or not isinstance(hexcode, str) or not hexcode.startswith("#"):
+            return None
 
-     try:
-        r = int(hexcode[1:3], 16)
-        g = int(hexcode[3:5], 16)
-        b = int(hexcode[5:7], 16)
-     except:
-        return None
-
-     best, min_dist = None, float("inf")
-     for name, (cr, cg, cb) in CANONICAL_COLORS.items():
-        dist = math.sqrt((r-cr)**2 + (g-cg)**2 + (b-cb)**2)
-        if dist < min_dist:
-            min_dist = dist
-            best = name
-
-    # 🔒 HARD THRESHOLD
-    # if too far → keep as maroon family instead of black
-     if min_dist > 120:
-        return "maroon"
-
-     return best
-
-
-    def extract_price(self, q):
-        if not q: return None
-        m = re.search(r'(under|less than|below|<)\s*₹?\s*(\d+)', q.lower())
-        return int(m.group(2)) if m else None
-
-    def call_llm(self, q):
-        if not q: return {}
-        prompt = (
-            "Extract ONLY style from user request.\n"
-            "Return JSON: {\"style\": null | formal | casual | party | office | ethnic | sports}\n\n"
-            f"User: {q}"
-        )
-        inputs = self.tokenizer(prompt, return_tensors="pt")
-        with torch.no_grad():
-            out = self.model.generate(**inputs, max_new_tokens=40)
-        txt = self.tokenizer.decode(out[0], skip_special_tokens=True)
         try:
-            return json.loads(re.search(r"\{.*\}", txt, re.S).group())
-        except:
+            r = int(hexcode[1:3], 16)
+            g = int(hexcode[3:5], 16)
+            b = int(hexcode[5:7], 16)
+        except Exception:
+            return None
+
+        best_color = None
+        min_dist = float("inf")
+
+        for name, (cr, cg, cb) in CANONICAL_COLORS.items():
+            dist = math.sqrt((r - cr) ** 2 + (g - cg) ** 2 + (b - cb) ** 2)
+            if dist < min_dist:
+                min_dist = dist
+                best_color = name
+
+        # Hard cutoff → avoid incorrect black/white jumps
+        if min_dist > 120:
+            return "maroon"
+
+        return best_color
+
+
+    # --------------------------------------------------
+    # Price extraction (rule-based, safe)
+    # --------------------------------------------------
+    def extract_price(self, query):
+        if not query:
+            return None
+
+        m = re.search(r'(under|less than|below|<)\s*₹?\s*(\d+)', query.lower())
+        if m:
+            return int(m.group(2))
+
+        return None
+
+
+    # --------------------------------------------------
+    # Minimal LLM call (ONLY for soft intent)
+    # --------------------------------------------------
+    def call_llm(self, query):
+        if not query:
             return {}
 
+        prompt = (
+            "Extract ONLY style from the user request.\n"
+            "Return valid JSON ONLY.\n\n"
+            "Format:\n"
+            "{\"style\": \"formal\" | \"casual\" | \"party\" | \"office\" | \"ethnic\" | \"sports\" | null}\n\n"
+            f"User request: {query}"
+        )
+
+        inputs = self.tokenizer(prompt, return_tensors="pt")
+
+        with torch.no_grad():
+            output = self.model.generate(**inputs, max_new_tokens=40)
+
+        text = self.tokenizer.decode(output[0], skip_special_tokens=True)
+
+        try:
+            return json.loads(re.search(r"\{.*\}", text, re.S).group())
+        except Exception:
+            return {}
+
+
+    # ==================================================
+    # MAIN FILTER GENERATION (CORE LOGIC)
+    # ==================================================
     def generate_filters(self, item, scene, user_query):
-        # AG-MAN is ground truth
+        """
+        Two explicit reasoning modes:
+
+        MODE A — Auto Reasoning:
+            Triggered when user_query is None
+            Uses AG-MAN + Scene
+
+        MODE B — Refinement Reasoning:
+            Triggered when user_query exists
+            AG-MAN is locked, user refines soft attributes
+        """
+
+        # -------------------------------
+        # Base filters from AG-MAN
+        # -------------------------------
         filters = {
             "color": self.hex_to_color(item.get("color_hex")),
             "pattern": item.get("pattern"),
             "sleeve_length": item.get("sleeve_length"),
             "style": None,
-            "price_max": self.extract_price(user_query)
+            "price_max": None
         }
 
-        # LLM only for style
-        llm = self.call_llm(user_query)
-        if llm.get("style") in self.style_words:
-            filters["style"] = llm["style"]
+        # ==================================================
+        # MODE A — AUTO REASONING (NO USER QUERY)
+        # ==================================================
+        if not user_query:
+            if scene and scene.get("confidence", 0) >= 0.6:
+                scene_label = scene.get("scene_label", "").lower()
 
-        # USER OVERRIDE COLOR
-        for c in VALID_COLORS:
-            if user_query and re.search(rf"\b{c}\b", user_query.lower()):
-                filters["color"] = c
+                if any(k in scene_label for k in ["arena", "performance", "outdoor"]):
+                    filters["style"] = "casual"
+
+                elif any(k in scene_label for k in ["office", "indoor"]):
+                    filters["style"] = "formal"
+
+            return {"filters": filters}
+
+
+        # ==================================================
+        # MODE B — USER REFINEMENT
+        # ==================================================
+        filters["price_max"] = self.extract_price(user_query)
+
+        llm_out = self.call_llm(user_query)
+        if llm_out.get("style") in self.style_words:
+            filters["style"] = llm_out["style"]
+
+        # Explicit color override only if user mentions it
+        for color in VALID_COLORS:
+            if re.search(rf"\b{color}\b", user_query.lower()):
+                filters["color"] = color
                 break
 
         return {"filters": filters}
