@@ -3,12 +3,18 @@
 # ------------------------------------------------------------
 
 # ---------------------------
-# YOLOv8 Configuration
+# YOLOv8 Configuration (Ensemble Detection)
 # ---------------------------
-YOLO_WEIGHTS = "data/yolo/detect.pt"   # Pretrained model
+# Multiple models for ensemble detection (better recall)
+YOLO_MODELS = [
+    "data/yolo/best.pt",                  # Large model 1
+    "data/yolo/yolov8x_best_100 .pt",     # Medium model
+    "data/yolo/best_yolov8m_27.pt",       # Small model 1
+    "data/yolo/detect.pt"                 # Small model 2
+]
 YOLO_CONF_THRESH = 0.35
 YOLO_IOU = 0.45
-YOLO_INPUT_SIZE = 640
+YOLO_INPUT_SIZE = 960
 
 # ---------------------------
 # AG-MAN Attribute Extractor (Pretrained or Public weights)

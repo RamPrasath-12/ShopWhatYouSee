@@ -11,7 +11,7 @@ def get_db():
         host="localhost",
         database="shopwhatyousee",
         user="postgres",
-        password="postgres123@"
+        password="123456"
     )
 
 

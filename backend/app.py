@@ -1,6 +1,6 @@
 import base64, cv2, numpy as np
 from models.yolo_detector import YoloDetector
-from config import YOLO_WEIGHTS, YOLO_CONF_THRESH
+from config import YOLO_MODELS, YOLO_CONF_THRESH
 from models.agman_extractor import process_crop_base64
 from models.scene_context import SceneContextDetector
 from models.llm_reasoner import LLMReasoner
@@ -17,7 +17,7 @@ def get_db():
         host="localhost",
         database="shopwhatyousee",
         user="postgres",
-        password="postgres123@"
+        password="123456"
     )
 
 
@@ -32,7 +32,7 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 scene_detector = SceneContextDetector()
 
 llm = LLMReasoner(model_name="google/flan-t5-small")  # or the model you have loaded
-yolo = YoloDetector(YOLO_WEIGHTS)
+yolo = YoloDetector(YOLO_MODELS)  # Ensemble detection with multiple models
 
 def b64_to_cv2(img_b64):
     header, data = img_b64.split(',', 1)
@@ -55,9 +55,21 @@ def detect():
         return jsonify({"error": "No image received"}), 400
 
     frame = b64_to_cv2(img_b64)
+    
+    # DEBUG: Log image dimensions
+    h, w = frame.shape[:2]
+    print(f"\n📸 DETECTION REQUEST:")
+    print(f"   Image size: {w}x{h} pixels")
+    print(f"   Aspect ratio: {w/h:.2f}")
 
     detections = yolo.infer(frame)
     detections = [d for d in detections if d['conf'] >= YOLO_CONF_THRESH]
+    
+    # DEBUG: Log detection results
+    print(f"   Detections found: {len(detections)}")
+    for i, det in enumerate(detections):
+        print(f"   [{i+1}] {det['class']} (conf={det['conf']:.2f})")
+    print()
 
     return jsonify({"detections": detections})
 
@@ -65,9 +77,10 @@ def detect():
 def extract_attributes():
     data = request.get_json()
     b64 = data.get("image")
+    category = data.get("category", "unknown")  # Default if missing
     if not b64:
         return jsonify({"error":"no image provided"}), 400
-    result = process_crop_base64(b64)
+    result = process_crop_base64(b64, category)
     return jsonify(result)
 
 @app.route('/scene', methods=['POST'])
