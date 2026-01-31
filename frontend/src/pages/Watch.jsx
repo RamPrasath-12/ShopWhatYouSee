@@ -112,6 +112,7 @@ const Watch = () => {
     const [duration, setDuration] = useState(0);
     const [detections, setDetections] = useState([]);
     const [loading, setLoading] = useState(false); // Restore loading state
+    const [loadingType, setLoadingType] = useState('items'); // 'items' or 'scene'
     const [muted, setMuted] = useState(false); // Add muted state
 
     const toggleMute = () => {
@@ -290,11 +291,12 @@ const Watch = () => {
         setSelectionCurrent(null);
         setIsSelectionMode(false);
 
-        if (w > 10 && h > 10) {
+        if (w > 20 && h > 20) {
             // Valid selection -> Trigger Detection
+            setLoadingType('items');
+            setLoading(true);
             const croppedB64 = captureCroppedFrame({ x, y, w, h });
             if (croppedB64) {
-                setLoading(true);
                 try {
                     const res = await axios.post("http://localhost:5000/detect", {
                         image: croppedB64
@@ -310,6 +312,7 @@ const Watch = () => {
 
     // Standard Magic Click (Full Frame)
     const handleMagicClick = async () => {
+        setLoadingType('items');
         setLoading(true);
         const fullCanvas = captureFrame();
         const frameB64 = fullCanvas.toDataURL("image/jpeg", 0.9);
@@ -333,8 +336,13 @@ const Watch = () => {
 
     // Scene Detection
     const handleSceneDetect = async () => {
+        setLoadingType('scene');
+        setLoading(true);
         const fullCanvas = captureFrame();
-        if (!fullCanvas) return;
+        if (!fullCanvas) {
+            setLoading(false);
+            return;
+        }
         const frameB64 = fullCanvas.toDataURL("image/jpeg", 0.9);
 
         try {
@@ -346,6 +354,7 @@ const Watch = () => {
         } catch (err) {
             console.error("Scene Detection Error:", err);
         }
+        setLoading(false);
     };
 
     // AG-MAN Attribute Extraction
@@ -451,267 +460,280 @@ const Watch = () => {
     };
 
     return (
-        <div style={styles.container}>
-            <div
-                style={{
-                    ...styles.playerWrapper,
-                    cursor: isSelectionMode ? 'crosshair' : 'default'
-                }}
-                ref={containerRef}
-                onMouseEnter={() => setShowControls(true)}
-                onMouseLeave={() => setShowControls(false)}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-            >
-                <video
-                    ref={videoRef}
-                    src={movie.videoSrc}
-                    style={styles.video}
-                    onClick={togglePlay}
-                    loop
-                    muted={muted}
-                    crossOrigin="anonymous"
-                />
+        <>
+            <style>
+                {`
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                `}
+            </style>
+            <div style={styles.container}>
+                <div
+                    style={{
+                        ...styles.playerWrapper,
+                        cursor: isSelectionMode ? 'crosshair' : 'default'
+                    }}
+                    ref={containerRef}
+                    onMouseEnter={() => setShowControls(true)}
+                    onMouseLeave={() => setShowControls(false)}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                >
+                    <video
+                        ref={videoRef}
+                        src={movie.videoSrc}
+                        style={styles.video}
+                        onClick={togglePlay}
+                        loop
+                        muted={muted}
+                        crossOrigin="anonymous"
+                    />
 
-                {/* Selection Box Overlay */}
-                {isSelectionMode && selectionStart && (
-                    <div style={getSelectionStyle()}></div>
-                )}
+                    {/* Selection Box Overlay */}
+                    {isSelectionMode && selectionStart && (
+                        <div style={getSelectionStyle()}></div>
+                    )}
 
-                {/* Visual indicator for Lens Mode */}
-                {isSelectionMode && !selectionStart && (
-                    <div style={styles.lensInstruction}>
-                        Click and drag to select an item
-                    </div>
-                )}
+                    {/* Visual indicator for Lens Mode */}
+                    {isSelectionMode && !selectionStart && (
+                        <div style={styles.lensInstruction}>
+                            Click and drag to select an item
+                        </div>
+                    )}
 
-                {/* Top Overlay */}
-                <div style={{
-                    ...styles.topOverlay,
-                    opacity: (showControls || paused || isSelectionMode) ? 1 : 0
-                }}>
-                    <div style={styles.topLeft}>
-                        <div style={styles.xrayBadge}>X-Ray</div>
-                        <div style={styles.movieTitle}>{movie.title}</div>
-                    </div>
-
-                    <div style={styles.topRight}>
-                        {/* Action Buttons */}
-                        {(paused || isSelectionMode) && !loading && detections.length === 0 && (
-                            <>
-                                {/* Lens Button */}
-                                <button
-                                    style={{
-                                        ...styles.magicButtonIcon,
-                                        borderColor: isSelectionMode ? '#00a8e1' : '#ccc',
-                                        color: isSelectionMode ? '#00a8e1' : '#white',
-                                        background: isSelectionMode ? 'rgba(0, 168, 225, 0.2)' : 'rgba(255,255,255,0.1)'
-                                    }}
-                                    onClick={toggleLensMode}
-                                    title="Google Lens Region Search"
-                                >
-                                    <LensIcon />
-                                </button>
-
-                                {/* Magic Button (Full Frame) */}
-                                <button
-                                    style={styles.magicButtonIcon}
-                                    onClick={handleMagicClick}
-                                    title="Scan Full Scene"
-                                >
-                                    <MagicIcon />
-                                </button>
-
-                                {/* Scene Detection Button */}
-                                <button
-                                    style={{
-                                        ...styles.magicButtonIcon,
-                                        borderColor: scene ? '#4caf50' : '#ccc',
-                                        color: scene ? '#4caf50' : 'white',
-                                        background: scene ? 'rgba(76, 175, 80, 0.2)' : 'rgba(255,255,255,0.1)'
-                                    }}
-                                    onClick={handleSceneDetect}
-                                    title="Detect Scene Context"
-                                >
-                                    <SceneIcon />
-                                </button>
-                            </>
-                        )}
-                        <button style={styles.iconBtn}><CaptionsIcon /></button>
-                        <button style={styles.iconBtn}><SettingsIcon /></button>
-                        <button style={styles.iconBtn} onClick={toggleMute}>
-                            {muted ? (
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                                    <line x1="23" y1="9" x2="17" y2="15"></line>
-                                    <line x1="17" y1="9" x2="23" y2="15"></line>
-                                </svg>
-                            ) : (
-                                <VolumeIcon />
-                            )}
-                        </button>
-                        <button style={styles.iconBtn}><FullscreenIcon /></button>
-                        <button style={styles.iconBtn} onClick={() => navigate('/')}><CloseIcon /></button>
-                    </div>
-                </div>
-
-                {/* Scene Context Badge (Permanent) */}
-                {scene && (
-                    <div style={styles.sceneOverlay}>
-                        {formatSceneLabel(scene.scene_label)}
-                    </div>
-                )}
-
-                {/* Center Controls */}
-                <div style={{
-                    ...styles.centerControls,
-                    opacity: (showControls || paused) && !isSelectionMode ? 1 : 0,
-                    pointerEvents: isSelectionMode ? 'none' : 'auto'
-                }}>
-                    <button style={styles.skipBtn} onClick={() => skipTime(-10)}>
-                        <Rewind10Icon />
-                    </button>
-
-                    <button style={styles.playPauseBtn} onClick={togglePlay}>
-                        {paused ? <PlayIcon /> : <PauseIcon />}
-                    </button>
-
-                    <button style={styles.skipBtn} onClick={() => skipTime(10)}>
-                        <Forward10Icon />
-                    </button>
-                </div>
-
-                {/* Loading State */}
-                {loading && (
-                    <div style={styles.centerOverlay}>
-                        <div style={styles.loaderSpinner}></div>
-                    </div>
-                )}
-
-                {/* Bottom Bar */}
-                <div style={{
-                    ...styles.bottomBar,
-                    opacity: (showControls || paused) ? 1 : 0
-                }}>
-                    <div style={styles.timeDisplay}>
-                        {formatTime(currentTime)} / {formatTime(duration)}
-                    </div>
-                    <div style={styles.progressBarContainer} onClick={handleSeek}>
-                        <div style={{
-                            ...styles.progressBar,
-                            width: `${(currentTime / duration) * 100}%`
-                        }}></div>
-                    </div>
-                </div>
-
-                {/* Detection Results Sidebar */}
-                {detections.length > 0 && (
-                    <div style={styles.sidebar}>
-                        <div style={styles.sidebarHeader}>
-                            <h3 style={styles.sidebarTitle}>Lens Results</h3>
-                            <button style={styles.closeBtn} onClick={() => setDetections([])}>
-                                <CloseIcon />
-                            </button>
+                    {/* Top Overlay */}
+                    <div style={{
+                        ...styles.topOverlay,
+                        opacity: (showControls || paused || isSelectionMode) ? 1 : 0
+                    }}>
+                        <div style={styles.topLeft}>
+                            <div style={styles.xrayBadge}>X-Ray</div>
+                            <div style={styles.movieTitle}>{movie.title}</div>
                         </div>
 
-                        {/* Scene Context Badge */}
-                        {scene && (
-                            <div style={styles.sceneBadge}>
-                                {formatSceneLabel(scene.scene_label)}
-                            </div>
-                        )}
-
-                        <div style={styles.itemsGrid}>
-                            {detections.map((item, idx) => (
-                                <div key={idx}>
-                                    <div
+                        <div style={styles.topRight}>
+                            {/* Action Buttons */}
+                            {(paused || isSelectionMode) && !loading && detections.length === 0 && (
+                                <>
+                                    {/* Lens Button */}
+                                    <button
                                         style={{
-                                            ...styles.itemCard,
-                                            borderColor: selectedItem === item ? '#00a8e1' : 'transparent'
+                                            ...styles.magicButtonIcon,
+                                            borderColor: isSelectionMode ? '#00a8e1' : '#ccc',
+                                            color: isSelectionMode ? '#00a8e1' : '#white',
+                                            background: isSelectionMode ? 'rgba(0, 168, 225, 0.2)' : 'rgba(255,255,255,0.1)'
                                         }}
-                                        onClick={() => handleItemClick(item)}
+                                        onClick={toggleLensMode}
+                                        title="Google Lens Region Search"
                                     >
-                                        <div style={styles.imageWrapper}>
-                                            <img
-                                                src={`data:image/jpeg;base64,${item.cropped_image}`}
-                                                alt={item.class}
-                                                style={styles.itemImage}
-                                            />
-                                        </div>
-                                        <div style={styles.itemInfo}>
-                                            <div style={styles.itemClass}>{item.class}</div>
-                                            <div style={styles.shopLink}>
-                                                {selectedItem === item ? 'Selected ✓' : 'Tap to analyze ›'}
+                                        <LensIcon />
+                                    </button>
+
+                                    {/* Magic Button (Full Frame) */}
+                                    <button
+                                        style={styles.magicButtonIcon}
+                                        onClick={handleMagicClick}
+                                        title="Scan Full Scene"
+                                    >
+                                        <MagicIcon />
+                                    </button>
+
+                                    {/* Scene Detection Button */}
+                                    <button
+                                        style={{
+                                            ...styles.magicButtonIcon,
+                                            borderColor: scene ? '#4caf50' : '#ccc',
+                                            color: scene ? '#4caf50' : 'white',
+                                            background: scene ? 'rgba(76, 175, 80, 0.2)' : 'rgba(255,255,255,0.1)'
+                                        }}
+                                        onClick={handleSceneDetect}
+                                        title="Detect Scene Context"
+                                    >
+                                        <SceneIcon />
+                                    </button>
+                                </>
+                            )}
+                            <button style={styles.iconBtn}><CaptionsIcon /></button>
+                            <button style={styles.iconBtn}><SettingsIcon /></button>
+                            <button style={styles.iconBtn} onClick={toggleMute}>
+                                {muted ? (
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                                        <line x1="23" y1="9" x2="17" y2="15"></line>
+                                        <line x1="17" y1="9" x2="23" y2="15"></line>
+                                    </svg>
+                                ) : (
+                                    <VolumeIcon />
+                                )}
+                            </button>
+                            <button style={styles.iconBtn}><FullscreenIcon /></button>
+                            <button style={styles.iconBtn} onClick={() => navigate('/')}><CloseIcon /></button>
+                        </div>
+                    </div>
+
+                    {/* Scene Context Badge (Permanent) */}
+                    {scene && (
+                        <div style={styles.sceneOverlay}>
+                            {formatSceneLabel(scene.scene_label)}
+                        </div>
+                    )}
+
+                    {/* Center Controls */}
+                    <div style={{
+                        ...styles.centerControls,
+                        opacity: (showControls || paused) && !isSelectionMode ? 1 : 0,
+                        pointerEvents: isSelectionMode ? 'none' : 'auto'
+                    }}>
+                        <button style={styles.skipBtn} onClick={() => skipTime(-10)}>
+                            <Rewind10Icon />
+                        </button>
+
+                        <button style={styles.playPauseBtn} onClick={togglePlay}>
+                            {paused ? <PlayIcon /> : <PauseIcon />}
+                        </button>
+
+                        <button style={styles.skipBtn} onClick={() => skipTime(10)}>
+                            <Forward10Icon />
+                        </button>
+                    </div>
+
+                    {/* Loading State */}
+                    {loading && (
+                        <div style={styles.centerOverlay}>
+                            <div style={styles.loaderSpinner}></div>
+                            <div style={styles.loadingText}>
+                                {loadingType === 'scene' ? 'detecting the scene...' : 'detecting items...'}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Bottom Bar */}
+                    <div style={{
+                        ...styles.bottomBar,
+                        opacity: (showControls || paused) ? 1 : 0
+                    }}>
+                        <div style={styles.timeDisplay}>
+                            {formatTime(currentTime)} / {formatTime(duration)}
+                        </div>
+                        <div style={styles.progressBarContainer} onClick={handleSeek}>
+                            <div style={{
+                                ...styles.progressBar,
+                                width: `${(currentTime / duration) * 100}%`
+                            }}></div>
+                        </div>
+                    </div>
+
+                    {/* Detection Results Sidebar */}
+                    {detections.length > 0 && (
+                        <div style={styles.sidebar}>
+                            <div style={styles.sidebarHeader}>
+                                <h3 style={styles.sidebarTitle}>Lens Results</h3>
+                                <button style={styles.closeBtn} onClick={() => setDetections([])}>
+                                    <CloseIcon />
+                                </button>
+                            </div>
+
+                            {/* Scene Context Badge */}
+                            {scene && (
+                                <div style={styles.sceneBadge}>
+                                    {formatSceneLabel(scene.scene_label)}
+                                </div>
+                            )}
+
+                            <div style={styles.itemsGrid}>
+                                {detections.map((item, idx) => (
+                                    <div key={idx}>
+                                        <div
+                                            style={{
+                                                ...styles.itemCard,
+                                                borderColor: selectedItem === item ? '#00a8e1' : 'transparent'
+                                            }}
+                                            onClick={() => handleItemClick(item)}
+                                        >
+                                            <div style={styles.imageWrapper}>
+                                                <img
+                                                    src={`data:image/jpeg;base64,${item.cropped_image}`}
+                                                    alt={item.class}
+                                                    style={styles.itemImage}
+                                                />
+                                            </div>
+                                            <div style={styles.itemInfo}>
+                                                <div style={styles.itemClass}>{item.class}</div>
+                                                <div style={styles.shopLink}>
+                                                    {selectedItem === item ? 'Selected ✓' : 'Tap to analyze ›'}
+                                                </div>
                                             </div>
                                         </div>
+
+                                        {/* AG-MAN Attributes (shown when selected) */}
+                                        {selectedItem === item && (
+                                            <div style={styles.attributesBox}>
+                                                {loadingAttributes ? (
+                                                    <div style={styles.attrLoading}>Analyzing...</div>
+                                                ) : attributes ? (
+                                                    <>
+                                                        <div style={styles.attrTitle}>Visual Attributes</div>
+                                                        <div style={styles.attrRow}>
+                                                            <span style={styles.attrLabel}>Color:</span>
+                                                            <div style={styles.colorRow}>
+                                                                <div style={{
+                                                                    ...styles.colorSwatch,
+                                                                    background: attributes.color_hex
+                                                                }}></div>
+                                                                <span style={{ color: 'white', fontWeight: '500' }}>
+                                                                    {attributes.color_name || attributes.color_hex}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        {attributes.pattern && (
+                                                            <div style={styles.attrRow}>
+                                                                <span style={styles.attrLabel}>Pattern:</span>
+                                                                <span style={{ color: 'white', fontWeight: '500' }}>
+                                                                    {attributes.pattern}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {attributes.sleeve_length && (
+                                                            <div style={styles.attrRow}>
+                                                                <span style={styles.attrLabel}>Sleeve:</span>
+                                                                <span style={{ color: 'white', fontWeight: '500' }}>
+                                                                    {attributes.sleeve_length}
+                                                                </span>
+                                                            </div>
+                                                        )}
+
+                                                        {/* LLM Query Input */}
+                                                        <div style={styles.llmSection}>
+                                                            <div style={styles.attrLabel}>Refine Search (Optional)</div>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="e.g., casual, under ₹2000"
+                                                                value={userQuery}
+                                                                onChange={(e) => setUserQuery(e.target.value)}
+                                                                style={styles.llmInput}
+                                                            />
+                                                            <button
+                                                                style={styles.shopButton}
+                                                                onClick={navigateToProducts}
+                                                            >
+                                                                Shop Similar Items →
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                ) : null}
+                                            </div>
+                                        )}
                                     </div>
-
-                                    {/* AG-MAN Attributes (shown when selected) */}
-                                    {selectedItem === item && (
-                                        <div style={styles.attributesBox}>
-                                            {loadingAttributes ? (
-                                                <div style={styles.attrLoading}>Analyzing...</div>
-                                            ) : attributes ? (
-                                                <>
-                                                    <div style={styles.attrTitle}>Visual Attributes</div>
-                                                    <div style={styles.attrRow}>
-                                                        <span style={styles.attrLabel}>Color:</span>
-                                                        <div style={styles.colorRow}>
-                                                            <div style={{
-                                                                ...styles.colorSwatch,
-                                                                background: attributes.color_hex
-                                                            }}></div>
-                                                            <span style={{ color: 'white', fontWeight: '500' }}>
-                                                                {attributes.color_name || attributes.color_hex}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    {attributes.pattern && (
-                                                        <div style={styles.attrRow}>
-                                                            <span style={styles.attrLabel}>Pattern:</span>
-                                                            <span style={{ color: 'white', fontWeight: '500' }}>
-                                                                {attributes.pattern}
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    {attributes.sleeve_length && (
-                                                        <div style={styles.attrRow}>
-                                                            <span style={styles.attrLabel}>Sleeve:</span>
-                                                            <span style={{ color: 'white', fontWeight: '500' }}>
-                                                                {attributes.sleeve_length}
-                                                            </span>
-                                                        </div>
-                                                    )}
-
-                                                    {/* LLM Query Input */}
-                                                    <div style={styles.llmSection}>
-                                                        <div style={styles.attrLabel}>Refine Search (Optional)</div>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="e.g., casual, under ₹2000"
-                                                            value={userQuery}
-                                                            onChange={(e) => setUserQuery(e.target.value)}
-                                                            style={styles.llmInput}
-                                                        />
-                                                        <button
-                                                            style={styles.shopButton}
-                                                            onClick={navigateToProducts}
-                                                        >
-                                                            Shop Similar Items →
-                                                        </button>
-                                                    </div>
-                                                </>
-                                            ) : null}
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
-        </div>
+        </>
     );
 };
 
@@ -834,15 +856,33 @@ const styles = {
         top: "50%",
         left: "50%",
         transform: "translate(-50%, -50%)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "25px 35px",
+        background: "rgba(0, 0, 0, 0.75)",
+        borderRadius: "16px",
+        backdropFilter: "blur(8px)",
+        border: "1px solid rgba(76, 175, 80, 0.3)",
         zIndex: 25
     },
     loaderSpinner: {
-        width: "50px",
-        height: "50px",
-        border: "5px solid rgba(255,255,255,0.3)",
-        borderTop: "5px solid #00a8e1",
+        width: "40px",
+        height: "40px",
+        border: "3px solid rgba(76, 175, 80, 0.15)",
+        borderTop: "3px solid #4caf50",
         borderRadius: "50%",
-        animation: "spin 1s linear infinite"
+        animation: "spin 0.8s linear infinite"
+    },
+    loadingText: {
+        color: "#4caf50",
+        fontSize: "13px",
+        fontWeight: "600",
+        marginTop: "12px",
+        textAlign: "center",
+        letterSpacing: "0.3px",
+        opacity: 0.95
     },
     bottomBar: {
         position: "absolute",

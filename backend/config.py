@@ -7,7 +7,6 @@
 # ---------------------------
 # Multiple models for ensemble detection (better recall)
 YOLO_MODELS = [
-    "data/yolo/best.pt",                  # Large model 1
     "data/yolo/yolov8x_best_100 .pt",     # Medium model
     "data/yolo/best_yolov8m_27.pt",       # Small model 1
     "data/yolo/detect.pt"                 # Small model 2
