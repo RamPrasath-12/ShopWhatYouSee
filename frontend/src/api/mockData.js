@@ -1,99 +1,91 @@
-
+// Local videos from frontend/public
 export const MOVIES = [
     {
         id: 1,
-        title: "Urban Street Style",
-        thumbnail: "https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?auto=format&fit=crop&q=80&w=1887",
-        videoSrc: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-        description: "Discover the latest trends in urban fashion, featuring oversized coats, denim, and streetwear essentials.",
-        category: "Fashion"
-    },
-    {
-        id: 2,
-        title: "Summer Collection 2024",
-        thumbnail: "https://image.tmdb.org/t/p/original/aW7158M93XJ1ZlE8r5N1XQ8J0qA.jpg",
-        videoSrc: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
-        description: "A showcase of light, breezy summer outfits perfect for beach days and city walks.",
-        category: "Lifestyle"
-    },
-    {
-        id: 3,
-        title: "The Business Look",
-        thumbnail: "https://image.tmdb.org/t/p/original/mJbfBvC41XwXw6a1w0M4i1X0z0.jpg",
-        videoSrc: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-        description: "Reinventing office wear with sharp suits, blazers, and professional accessories for the modern workplace.",
-        category: "Business"
-    },
-    {
-        id: 4,
-        title: "Evening Elegance",
-        thumbnail: "https://image.tmdb.org/t/p/original/iUgygt3fscRoKWCV1d0C7FbM9TP.jpg",
-        videoSrc: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
-        description: "High-fashion evening wear featuring stunning gowns and sophisticated suits for gala events.",
-        category: "Luxury"
-    },
-    {
-        id: 5,
-        title: "Autumn Layers",
-        thumbnail: "https://image.tmdb.org/t/p/original/pThyQovXQrw2m0s9x82twj48Jq4.jpg",
-        videoSrc: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4",
-        description: "Mastering the art of layering with scarfs, trench coats, and knitwear for the fall season.",
-        category: "Fashion"
-    },
-    {
-        id: 6,
-        title: "Bohemian Vibes",
-        thumbnail: "https://image.tmdb.org/t/p/original/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg",
-        videoSrc: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-        description: "Free-spirited fashion with flowing fabrics, earth tones, and eclectic accessories.",
-        category: "Lifestyle"
-    },
-    {
-        id: 7,
-        title: "Sport & Active",
-        thumbnail: "https://images.unsplash.com/photo-1517438476312-10d79c077309?auto=format&fit=crop&q=80&w=2070",
-        videoSrc: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4",
-        description: "High-performance athletic wear combined with modern style for workouts and active days.",
-        category: "Sports"
-    },
-    {
-        id: 8,
-        title: "Paris Fashion Week",
+        title: "Fashion Runway Edit",
         thumbnail: "https://images.unsplash.com/photo-1537832816519-689ad163238b?auto=format&fit=crop&q=80&w=2059",
-        videoSrc: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-        description: "Exclusive runway footage from the heart of the fashion world.",
+        videoSrc: "/movie.mp4",
+        description: "High-end fashion runway trends featuring latest collections.",
         category: "Runway"
     },
     {
-        id: 9,
-        title: "Weekend Casual",
-        thumbnail: "https://images.unsplash.com/photo-1529139574466-a302d2052505?auto=format&fit=crop&q=80&w=1888",
-        videoSrc: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4",
-        description: "Comfortable yet stylish outfits perfect for weekend getaways and coffee dates.",
+        id: 2,
+        title: "Casual Streetwear",
+        thumbnail: "https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?auto=format&fit=crop&q=80&w=1887",
+        videoSrc: "/sample.mp4",
+        description: "Urban style guide for the modern city dweller.",
         category: "Casual"
     },
     {
-        id: 10,
-        title: "Winter Coats",
+        id: 3,
+        title: "Accessories: Belts",
+        thumbnail: "https://images.unsplash.com/photo-1617137968427-85924c809a10?auto=format&fit=crop&q=80&w=100",
+        videoSrc: "/belt2.mp4",
+        description: "Essential accessories to complete your look.",
+        category: "Accessories"
+    },
+    {
+        id: 4,
+        title: "Headwear Collection",
+        thumbnail: "https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&q=80&w=100",
+        videoSrc: "/cap.mp4",
+        description: "Trendy caps and hats for every season.",
+        category: "Accessories"
+    },
+    {
+        id: 5,
+        title: "Jewelry Showcase",
+        thumbnail: "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&q=80&w=100",
+        videoSrc: "/earring.mp4",
+        description: "Elegant earrings and necklaces for special occasions.",
+        category: "Jewelry"
+    },
+    {
+        id: 6,
+        title: "Footwear Focus",
+        thumbnail: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=100",
+        videoSrc: "/shoes.mp4",
+        description: "Latest sneaker drops and formal shoes.",
+        category: "Footwear"
+    },
+    {
+        id: 7,
+        title: "Essential Tees",
+        thumbnail: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&q=80&w=100",
+        videoSrc: "/t_shirt.mp4",
+        description: "Premium cotton t-shirts in various colors.",
+        category: "Casual"
+    },
+    {
+        id: 8,
+        title: "Ethnic Elegance",
+        thumbnail: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&q=80&w=100",
+        videoSrc: "/saree.mp4",
+        description: "Traditional sarees and ethnic wear.",
+        category: "Ethnic"
+    },
+    {
+        id: 9,
+        title: "Winter Collection",
         thumbnail: "https://images.unsplash.com/photo-1542272201-98782ee20fb9?auto=format&fit=crop&q=80&w=1964",
-        videoSrc: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-        description: "Stay warm in style with our curated selection of premium winter coats and jackets.",
-        category: "Fashion"
+        videoSrc: "/vid.mp4",
+        description: "Cozy wear for the cold season.",
+        category: "Winter"
+    },
+    {
+        id: 10,
+        title: "Shoe Spotlight",
+        thumbnail: "https://images.unsplash.com/photo-1560769629-975e13b0f470?auto=format&fit=crop&q=80&w=100",
+        videoSrc: "/shoe1.mp4",
+        description: "In-depth look at our premium footwear.",
+        category: "Footwear"
     },
     {
         id: 11,
-        title: "Denim Days",
-        thumbnail: "https://images.unsplash.com/photo-1582418702059-97ebafb35d09?auto=format&fit=crop&q=80&w=2030",
-        videoSrc: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
-        description: "The ultimate guide to finding the perfect pair of jeans and denim jackets.",
-        category: "Denim"
-    },
-    {
-        id: 12,
-        title: "Red Carpet Ready",
-        thumbnail: "https://images.unsplash.com/photo-1566206091558-1f4034293c66?auto=format&fit=crop&q=80&w=2074",
-        videoSrc: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
-        description: "Celebrity-inspired looks for those special moments that require extra glamour.",
-        category: "Luxury"
+        title: "Summer Vibes",
+        thumbnail: "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?auto=format&fit=crop&q=80&w=100",
+        videoSrc: "/t_shirt.mp4",
+        description: "Light and breezy summer outfits.",
+        category: "Summer"
     }
 ];

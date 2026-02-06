@@ -16,7 +16,7 @@ import numpy as np
 from models.yolo_detector import YoloDetector
 from models.agman_extractor import process_crop_base64
 from models.scene_context import SceneContextDetector
-from models.llm_reasoner import LLMReasoner
+from models.gemini_reasoner import GeminiReasoner
 from models.product_retrieval import search_products
 from config import YOLO_WEIGHTS, YOLO_CONF_THRESH
 
@@ -26,7 +26,7 @@ from config import YOLO_WEIGHTS, YOLO_CONF_THRESH
 
 yolo = YoloDetector(YOLO_WEIGHTS)
 scene_detector = SceneContextDetector()
-llm = LLMReasoner()
+llm = GeminiReasoner()
 
 # -----------------------------
 # UTILITIES
@@ -95,15 +95,15 @@ def evaluate_latency():
     # 4. LLM Reasoning
     # -----------------------------
     t6 = time.time()
-    llm_output = llm.generate_filters(
-        item={
-            "category": item["class"],
+    llm_output = llm.reason(
+        category=item["class"],
+        agman_attributes={
             "color_hex": agman_result["attributes"]["color_hex"],
             "pattern": agman_result["attributes"]["pattern"],
             "sleeve_length": agman_result["attributes"]["sleeve_length"]
         },
-        scene=scene_result,
-        user_query=None
+        scene=scene_result.get("scene_label", ""),
+        user_query=""
     )
     t7 = time.time()
 
@@ -112,7 +112,7 @@ def evaluate_latency():
     # -----------------------------
     t8 = time.time()
     products = search_products({
-        **llm_output["filters"],
+        **(llm_output.get("final_filters", {})),
         "category": item["class"]
     })
     t9 = time.time()

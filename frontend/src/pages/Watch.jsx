@@ -130,13 +130,47 @@ const Watch = () => {
     // AG-MAN & LLM Pipeline State
     const [selectedItem, setSelectedItem] = useState(null);
     const [attributes, setAttributes] = useState(null);
+    const [embedding, setEmbedding] = useState(null);  // For FAISS similarity search
     const [loadingAttributes, setLoadingAttributes] = useState(false);
     const [scene, setScene] = useState(null);
     const [userQuery, setUserQuery] = useState("");
+    const [sessionHistory, setSessionHistory] = useState([]);  // For iterative LLM queries
 
     if (!movie) {
         return <div style={{ color: 'white', padding: 20 }}>Movie not found</div>;
     }
+
+    // ==========================================
+    // STATE PERSISTENCE (Fix refresh/back issue)
+    // ==========================================
+    useEffect(() => {
+        // Use localStorage for better persistence across tabs/reloads
+        const savedState = localStorage.getItem(`watch_state_${id}`);
+        if (savedState) {
+            try {
+                const parsed = JSON.parse(savedState);
+                console.log("🔄 Restoring saved state:", parsed);
+                if (parsed.detections) setDetections(parsed.detections);
+                if (parsed.attributes) setAttributes(parsed.attributes);
+                if (parsed.selectedItem) setSelectedItem(parsed.selectedItem);
+                if (parsed.sessionHistory) setSessionHistory(parsed.sessionHistory);
+            } catch (e) {
+                console.error("State restore failed:", e);
+            }
+        }
+    }, [id]);
+
+    // Save state whenever it changes
+    useEffect(() => {
+        const stateToSave = {
+            currentTime: currentTime,
+            detections: detections,
+            attributes: attributes,
+            selectedItem: selectedItem,
+            sessionHistory: sessionHistory,
+        };
+        localStorage.setItem(`watch_state_${id}`, JSON.stringify(stateToSave));
+    }, [currentTime, detections, attributes, selectedItem, sessionHistory, id]);
 
     // Format scene label: "science_museum" → "Science Museum"
     const formatSceneLabel = (label) => {
@@ -298,7 +332,10 @@ const Watch = () => {
             const croppedB64 = captureCroppedFrame({ x, y, w, h });
             if (croppedB64) {
                 try {
-                    const res = await axios.post("http://localhost:5000/detect", {
+                    // Trigger scene detection automatically in background
+                    handleSceneDetect();
+
+                    const res = await axios.post("/detect", {
                         image: croppedB64
                     });
                     setDetections(res.data.detections || []);
@@ -318,7 +355,10 @@ const Watch = () => {
         const frameB64 = fullCanvas.toDataURL("image/jpeg", 0.9);
 
         try {
-            const res = await axios.post("http://localhost:5000/detect", {
+            // Trigger scene detection automatically
+            handleSceneDetect();
+
+            const res = await axios.post("/detect", {
                 image: frameB64
             });
             setDetections(res.data.detections || []);
@@ -335,41 +375,30 @@ const Watch = () => {
     };
 
     // Scene Detection
+    // Scene Detection - DISABLED as per user request
     const handleSceneDetect = async () => {
-        setLoadingType('scene');
-        setLoading(true);
-        const fullCanvas = captureFrame();
-        if (!fullCanvas) {
-            setLoading(false);
-            return;
-        }
-        const frameB64 = fullCanvas.toDataURL("image/jpeg", 0.9);
-
-        try {
-            const res = await axios.post("http://localhost:5000/scene", {
-                image: frameB64
-            });
-            setScene(res.data);
-            console.log("Scene detected:", res.data);
-        } catch (err) {
-            console.error("Scene Detection Error:", err);
-        }
-        setLoading(false);
+        // Disabled logic to prevent scene appearing
+        console.log("Scene detection skipped as per configuration");
+        return;
     };
 
     // AG-MAN Attribute Extraction
     const handleItemClick = async (item) => {
         setSelectedItem(item);
         setAttributes(null);
+        setEmbedding(null);  // Reset embedding
         setUserQuery("");
         setLoadingAttributes(true);
 
         try {
-            const res = await axios.post("http://localhost:5000/extract-attributes", {
+            const res = await axios.post("/extract-attributes", {
                 image: item.cropped_image,
                 category: item.class
             });
             setAttributes(res.data.attributes);
+            setEmbedding(res.data.embedding);  // Store embedding for FAISS
+            console.log("[AGMAN] Attributes:", res.data.attributes);
+            console.log("[AGMAN] Embedding length:", res.data.embedding?.length);
         } catch (err) {
             console.error("AG-MAN Attribute Error:", err);
         }
@@ -380,25 +409,44 @@ const Watch = () => {
     const navigateToProducts = async () => {
         if (!selectedItem || !attributes) return;
 
+        // Add current query to session history for iterative refinement
+        const currentQuery = userQuery.trim();
+        const updatedHistory = currentQuery
+            ? [...sessionHistory, currentQuery].slice(-5)  // Keep last 5 queries
+            : sessionHistory;
+
+        if (currentQuery) {
+            setSessionHistory(updatedHistory);
+        }
+
         try {
-            // Call LLM to generate smart filters
+            console.time('[LLM] Filter generation');
+            // Call LLM to generate smart filters with session history
             const llmRes = await axios.post("http://localhost:5000/llm", {
                 item: {
                     category: selectedItem.class.toLowerCase(),
                     color_hex: attributes.color_hex,
+                    color_name: attributes.color_name,  // Include color name
                     pattern: attributes.pattern,
                     sleeve_length: attributes.sleeve_length
                 },
-                scene: scene,
-                user_query: userQuery.trim() || null
+                scene: scene?.scene_label || null,  // Pass scene label
+                user_query: currentQuery || null,
+                session_history: updatedHistory  // Pass session history for iterative queries
             });
+            console.timeEnd('[LLM] Filter generation');
 
-            // Navigate with enriched data
+            console.log("[LLM] Filters generated:", llmRes.data.filters);
+            console.log("[LLM] Source:", llmRes.data.source);
+
+            // Navigate with enriched data including embedding
             navigate(`/product/${selectedItem.class}`, {
                 state: {
                     item: { ...selectedItem, attributes },
                     llmFilters: llmRes.data.filters,
+                    embedding: embedding,  // Pass embedding for FAISS search
                     scene: scene,
+                    sessionHistory: updatedHistory,  // Pass history for continued refinement
                     movie: movie
                 }
             });
@@ -408,6 +456,7 @@ const Watch = () => {
             navigate(`/product/${selectedItem.class}`, {
                 state: {
                     item: { ...selectedItem, attributes },
+                    embedding: embedding,  // Still pass embedding
                     scene: scene,
                     movie: movie
                 }
@@ -541,19 +590,7 @@ const Watch = () => {
                                         <MagicIcon />
                                     </button>
 
-                                    {/* Scene Detection Button */}
-                                    <button
-                                        style={{
-                                            ...styles.magicButtonIcon,
-                                            borderColor: scene ? '#4caf50' : '#ccc',
-                                            color: scene ? '#4caf50' : 'white',
-                                            background: scene ? 'rgba(76, 175, 80, 0.2)' : 'rgba(255,255,255,0.1)'
-                                        }}
-                                        onClick={handleSceneDetect}
-                                        title="Detect Scene Context"
-                                    >
-                                        <SceneIcon />
-                                    </button>
+                                    {/* Scene Detection Button REMOVED - Auto triggered now */}
                                 </>
                             )}
                             <button style={styles.iconBtn}><CaptionsIcon /></button>
@@ -574,12 +611,12 @@ const Watch = () => {
                         </div>
                     </div>
 
-                    {/* Scene Context Badge (Permanent) */}
-                    {scene && (
+                    {/* Scene Context Badge (Permanent) - HIDDEN as user requested */}
+                    {/* {scene && (
                         <div style={styles.sceneOverlay}>
                             {formatSceneLabel(scene.scene_label)}
                         </div>
-                    )}
+                    )} */}
 
                     {/* Center Controls */}
                     <div style={{
@@ -636,12 +673,12 @@ const Watch = () => {
                                 </button>
                             </div>
 
-                            {/* Scene Context Badge */}
-                            {scene && (
+                            {/* Scene Context Badge - HIDDEN as requested */}
+                            {/* {scene && (
                                 <div style={styles.sceneBadge}>
                                     {formatSceneLabel(scene.scene_label)}
                                 </div>
-                            )}
+                            )} */}
 
                             <div style={styles.itemsGrid}>
                                 {detections.map((item, idx) => (

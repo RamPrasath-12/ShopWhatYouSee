@@ -110,6 +110,51 @@ const Browse = () => {
         });
     };
 
+    const MovieCard = ({ movie, onClick }) => {
+        const videoRef = React.useRef(null);
+        const [hover, setHover] = useState(false);
+
+        return (
+            <div
+                style={{
+                    ...styles.card,
+                    transform: hover ? 'scale(1.05)' : 'scale(1)',
+                    zIndex: hover ? 10 : 1
+                }}
+                onClick={() => onClick(movie)}
+                onMouseEnter={() => {
+                    setHover(true);
+                    videoRef.current?.play().catch(() => { }); // catch autoplay restrictions
+                }}
+                onMouseLeave={() => {
+                    setHover(false);
+                    if (videoRef.current) {
+                        videoRef.current.pause();
+                        videoRef.current.currentTime = 0;
+                    }
+                }}
+            >
+                <video
+                    ref={videoRef}
+                    src={movie.videoSrc}
+                    poster={movie.thumbnail || "https://via.placeholder.com/250x140?text=Prime+Video"}
+                    muted
+                    loop
+                    playsInline
+                    style={styles.cardImage}
+                />
+                <div style={styles.primeBadgeCard}>prime</div>
+                <div style={{
+                    position: 'absolute', bottom: 0, left: 0, right: 0, padding: '5px 10px',
+                    background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)',
+                    fontSize: '12px', fontWeight: 'bold'
+                }}>
+                    {movie.title}
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div style={styles.container}>
             {/* Navbar - Prime Video Style */}
@@ -126,7 +171,6 @@ const Browse = () => {
                     </div>
                 </div>
                 <div style={styles.rightNav}>
-                    {/* Hidden file input */}
                     <input
                         type="file"
                         accept="video/*"
@@ -134,10 +178,9 @@ const Browse = () => {
                         style={{ display: 'none' }}
                         id="nav-upload-input"
                     />
-                    {/* Upload button */}
-                    <label htmlFor="nav-upload-input" style={styles.uploadButton}>
+                    {/* Upload button - Icon Only */}
+                    <label htmlFor="nav-upload-input" style={{ ...styles.navIcon, cursor: 'pointer' }} title="Upload Video">
                         <UploadIcon />
-                        <span style={{ marginLeft: '6px' }}>Upload Video</span>
                     </label>
                     <span style={styles.navIcon}><SearchIcon /></span>
                     <span style={styles.navText}>EN</span>
@@ -158,7 +201,6 @@ const Browse = () => {
                     </div>
                     <h1 style={styles.heroTitle}>{featuredMovie.title}</h1>
 
-                    {/* Language options */}
                     <div style={styles.languages}>
                         <span style={styles.langBadge}>English</span>
                         <span style={styles.separator}>|</span>
@@ -170,7 +212,7 @@ const Browse = () => {
                     <div style={styles.ranking}>#1 in Fashion</div>
 
                     <div style={styles.heroButtons}>
-                        <button style={styles.playButton} onClick={() => handlePlay(featuredMovie.id)}>
+                        <button style={styles.playButton} onClick={() => handlePlay(featuredMovie)}>
                             <PlayIconFilled />
                             <span>Play</span>
                         </button>
@@ -188,8 +230,6 @@ const Browse = () => {
                 </div>
             </div>
 
-
-
             {/* Movie Rows */}
             <div style={{ ...styles.contentSection, marginTop: '-80px', position: 'relative', zIndex: 10 }}>
                 <div style={styles.rowHeader}>
@@ -198,22 +238,7 @@ const Browse = () => {
                 </div>
                 <div style={styles.row}>
                     {movies.map(movie => (
-                        <div
-                            key={movie.id}
-                            style={styles.card}
-                            onClick={() => handlePlay(movie)}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'scale(1.05)';
-                                e.currentTarget.style.zIndex = '10';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'scale(1)';
-                                e.currentTarget.style.zIndex = '1';
-                            }}
-                        >
-                            <img src={movie.thumbnail} alt={movie.title} style={styles.cardImage} />
-                            <div style={styles.primeBadgeCard}>prime</div>
-                        </div>
+                        <MovieCard key={movie.id} movie={movie} onClick={handlePlay} />
                     ))}
                 </div>
 
@@ -225,10 +250,7 @@ const Browse = () => {
                         </div>
                         <div style={styles.row}>
                             {topRated.map(movie => (
-                                <div key={movie.id} style={styles.card} onClick={() => handlePlay(movie)}>
-                                    <img src={movie.thumbnail} alt={movie.title} style={styles.cardImage} />
-                                    <div style={styles.primeBadgeCard}>prime</div>
-                                </div>
+                                <MovieCard key={movie.id} movie={movie} onClick={handlePlay} />
                             ))}
                         </div>
                     </>
@@ -241,10 +263,7 @@ const Browse = () => {
                         </div>
                         <div style={styles.row}>
                             {action.map(movie => (
-                                <div key={movie.id} style={styles.card} onClick={() => handlePlay(movie)}>
-                                    <img src={movie.thumbnail} alt={movie.title} style={styles.cardImage} />
-                                    <div style={styles.primeBadgeCard}>prime</div>
-                                </div>
+                                <MovieCard key={movie.id} movie={movie} onClick={handlePlay} />
                             ))}
                         </div>
                     </>
@@ -257,10 +276,7 @@ const Browse = () => {
                         </div>
                         <div style={styles.row}>
                             {comedy.map(movie => (
-                                <div key={movie.id} style={styles.card} onClick={() => handlePlay(movie)}>
-                                    <img src={movie.thumbnail} alt={movie.title} style={styles.cardImage} />
-                                    <div style={styles.primeBadgeCard}>prime</div>
-                                </div>
+                                <MovieCard key={movie.id} movie={movie} onClick={handlePlay} />
                             ))}
                         </div>
                     </>
@@ -273,10 +289,7 @@ const Browse = () => {
                         </div>
                         <div style={styles.row}>
                             {scifi.map(movie => (
-                                <div key={movie.id} style={styles.card} onClick={() => handlePlay(movie)}>
-                                    <img src={movie.thumbnail} alt={movie.title} style={styles.cardImage} />
-                                    <div style={styles.primeBadgeCard}>prime</div>
-                                </div>
+                                <MovieCard key={movie.id} movie={movie} onClick={handlePlay} />
                             ))}
                         </div>
                     </>

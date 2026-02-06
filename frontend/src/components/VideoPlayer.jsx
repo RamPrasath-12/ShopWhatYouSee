@@ -106,7 +106,7 @@ function VideoPlayer() {
     if (!frameB64) return;
 
     try {
-      const res = await axios.post("http://localhost:5000/detect", {
+      const res = await axios.post("/detect", {
         image: frameB64
       });
 
@@ -128,6 +128,67 @@ function VideoPlayer() {
   // =================================================
   // MODULE 3: AG-MAN ATTRIBUTE EXTRACTION
   // =================================================
+  // ... inside VideoPlayer component ...
+  const [history, setHistory] = useState([]); // conversation history
+
+  // ... (inside sendToLLM function) ...
+
+  const sendToLLM = async () => {
+    if (!selectedItem || !attributes) {
+      alert("Select an item first");
+      return;
+    }
+
+    // AUTO MODE if input empty
+    const query =
+      userText && userText.trim().length > 0
+        ? userText.trim()
+        : null;
+
+    // Add to local history (optimistic)
+    const currentHistory = [...history];
+    if (query) {
+      // Only add user queries to history for context
+      // We could also add system responses if we wanted full chat
+    }
+
+    const payload = {
+      item: {
+        category: selectedItem.class.toLowerCase(), // 🔒 YOLO ground truth
+        color_hex: attributes.color_hex,
+        pattern: attributes.pattern,
+        sleeve_length: attributes.sleeve_length
+      },
+      scene: scene || null,        // full scene object
+      user_query: query,           // null → AUTO MODE
+      history: history             // Send full history
+    };
+
+    try {
+      const res = await axios.post(
+        "/llm",
+        payload
+      );
+
+      console.log("LLM OUTPUT:", res.data);
+      setLlmOutput(res.data);
+
+      // Update history with this turn if meaningful
+      if (query) {
+        setHistory(prev => [...prev, query]);
+      }
+
+      // Clear input after sending
+      setUserText("");
+
+    } catch (err) {
+      console.error("LLM ERROR:", err);
+      alert("LLM failed");
+    }
+  };
+
+  // Clear history when item changes
+  // Clear history when item changes
   const handleItemClick = async (item) => {
     setSelectedItem(item);
     setAttributes(null);
@@ -135,11 +196,12 @@ function VideoPlayer() {
     setLlmOutput(null);
     setProducts([]);
     setUserText("");
+    setHistory([]); // RESET HISTORY
 
     setAttrLoading(true);
 
     try {
-      const res = await axios.post("http://localhost:5000/extract-attributes", {
+      const res = await axios.post("/extract-attributes", {
         image: item.cropped_image,
         category: item.class
       });
@@ -161,54 +223,12 @@ function VideoPlayer() {
     if (!frameB64) return;
 
     try {
-      const res = await axios.post("http://localhost:5000/scene", {
+      const res = await axios.post("/scene", {
         image: frameB64
       });
       setScene(res.data);
     } catch (err) {
       console.error("SCENE ERROR:", err);
-    }
-  };
-
-  // =================================================
-  // MODULE 5: LLM INTENT REASONING
-  // =================================================
-
-  const sendToLLM = async () => {
-    if (!selectedItem || !attributes) {
-      alert("Select an item first");
-      return;
-    }
-
-    // AUTO MODE if input empty
-    const query =
-      userText && userText.trim().length > 0
-        ? userText.trim()
-        : null;
-
-    const payload = {
-      item: {
-        category: selectedItem.class.toLowerCase(), // 🔒 YOLO ground truth
-        color_hex: attributes.color_hex,
-        pattern: attributes.pattern,
-        sleeve_length: attributes.sleeve_length
-      },
-      scene: scene || null,        // full scene object
-      user_query: query            // null → AUTO MODE
-    };
-
-    try {
-      const res = await axios.post(
-        "http://localhost:5000/llm",
-        payload
-      );
-
-      console.log("LLM OUTPUT:", res.data);
-      setLlmOutput(res.data);
-
-    } catch (err) {
-      console.error("LLM ERROR:", err);
-      alert("LLM failed");
     }
   };
 
@@ -236,7 +256,7 @@ function VideoPlayer() {
 
     try {
       const res = await axios.post(
-        "http://localhost:5000/search",
+        "/search",
         payload
       );
 
@@ -449,16 +469,30 @@ function VideoPlayer() {
         <div style={moduleBox}>
           <h3 style={moduleTitle}>LLM Intent Reasoning</h3>
 
+          <div style={{ marginBottom: "15px", maxHeight: "150px", overflowY: "auto", border: "1px solid #eee", padding: "10px", borderRadius: "6px" }}>
+            <p style={{ fontSize: "12px", color: "#888", marginBottom: "5px" }}>Conversation History:</p>
+            {history.length === 0 ? (
+              <p style={{ fontSize: "13px", color: "#ccc", fontStyle: "italic" }}>No history yet.</p>
+            ) : (
+              history.map((h, idx) => (
+                <div key={idx} style={{ padding: "4px 8px", background: "#f1f1f1", borderRadius: "4px", marginBottom: "4px", fontSize: "13px" }}>
+                  <strong>User:</strong> {h}
+                </div>
+              ))
+            )}
+          </div>
+
           <input
             type="text"
-            placeholder="Optional: refine results (e.g. under 2000, casual)"
+            placeholder="Refine search (e.g. 'Under 2000', 'Make it formal')..."
             value={userText}
             onChange={(e) => setUserText(e.target.value)}
             style={{
               padding: "8px",
-              width: "380px",
+              width: "100%", // Full width
               borderRadius: "6px",
-              border: "1px solid #ccc"
+              border: "1px solid #ccc",
+              boxSizing: "border-box"
             }}
           />
           {/* text for llm */}
