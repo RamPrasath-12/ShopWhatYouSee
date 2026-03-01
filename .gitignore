@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+venv/
+env/
+__pycache__/
+*.pyc
+
+# Local Config & Secrets
+.env
+.DS_Store
+
+# Large Data & Media (Do NOT Push)
+data/images/
+backend/static/products-unsplash/
+*.faiss
+*.pkl
+*.npy
+*.db
+*.csv
+*.mp4
+*.avi
+*.mov
+
+# Large Models - Weights (Global)
+*.pt
+*.pth
+*.onnx
+*.bin
+*.gguf
+*.safetensors
+
+# Specific Large Directories
+backend/data/yolo/
+backend/data/llm/
+backend/data/agman/
+agman_output/
+backend/models/*.pth
+
+# Datasets
+datasets/
+backend/data/db/
+data/*.db
+data/*.csv
+
+# Frontend Assets
+frontend/public/videos/
+frontend/public/assets/videos/
+frontend/dist/
+
+# Large files and directories excluded (auto-cleanup)
+backend/data/yolo/**
+backend/data/llm/**
+backend/data/agman/**
+backend/venv/
+data/products.db
+data/*.csv
+datasets/
+agman_output/
+

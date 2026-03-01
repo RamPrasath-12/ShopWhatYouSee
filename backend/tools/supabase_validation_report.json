@@ -1,0 +1,213 @@
+{
+  "queries": [
+    {
+      "query_pid": "earrings_9fb9a2933bf5",
+      "query_category": "earrings",
+      "supabase_top5_categories": [
+        "earrings",
+        "earrings",
+        "earrings",
+        "earrings",
+        "earrings"
+      ],
+      "supabase_top5_pids": [
+        "earrings_9fb9a2933bf5",
+        "earrings_8da4d4c546a3",
+        "earrings_54f9b687b04c",
+        "earrings_2fc2b674e8bb",
+        "earrings_ad94ec1f00ea"
+      ],
+      "category_matches": 5,
+      "supabase_latency_ms": 126.4
+    },
+    {
+      "query_pid": "Footwear_sandals_0b039d527a44",
+      "query_category": "Footwear_sandals",
+      "supabase_top5_categories": [
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_sandals"
+      ],
+      "supabase_top5_pids": [
+        "Footwear_sandals_0b039d527a44",
+        "Footwear_sandals_17fc8ab29eea",
+        "Footwear_sandals_cc551bafd710",
+        "Footwear_sandals_a431cb5752cc",
+        "Footwear_sandals_0f0f0b8a46b6"
+      ],
+      "category_matches": 5,
+      "supabase_latency_ms": 62.7
+    },
+    {
+      "query_pid": "glasses_74492f9d4e84",
+      "query_category": "glasses",
+      "supabase_top5_categories": [
+        "glasses",
+        "glasses",
+        "glasses",
+        "glasses",
+        "glasses"
+      ],
+      "supabase_top5_pids": [
+        "glasses_74492f9d4e84",
+        "glasses_53b1713a7825",
+        "glasses_80178ecdd43a",
+        "glasses_4f0706377f1a",
+        "glasses_ce0a6176c037"
+      ],
+      "category_matches": 5,
+      "supabase_latency_ms": 52.6
+    },
+    {
+      "query_pid": "blazer_319469694e01",
+      "query_category": "blazer",
+      "supabase_top5_categories": [
+        "blazer",
+        "blazer",
+        "blazer",
+        "blazer",
+        "blazer"
+      ],
+      "supabase_top5_pids": [
+        "blazer_319469694e01",
+        "blazer_d4a0445798b1",
+        "blazer_a1b8a7d38c37",
+        "blazer_7bcfb6515257",
+        "blazer_5e18536d2d40"
+      ],
+      "category_matches": 5,
+      "supabase_latency_ms": 71.2
+    },
+    {
+      "query_pid": "Footwear_sandals_ca7e4fe3dbf1",
+      "query_category": "Footwear_sandals",
+      "supabase_top5_categories": [
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_shoes"
+      ],
+      "supabase_top5_pids": [
+        "Footwear_sandals_ca7e4fe3dbf1",
+        "Footwear_sandals_ca5fb96c0e64",
+        "Footwear_sandals_61f28d6926ee",
+        "Footwear_sandals_be82da098f7e",
+        "Footwear_shoes_e26aa81f95b5"
+      ],
+      "category_matches": 4,
+      "supabase_latency_ms": 47.3
+    },
+    {
+      "query_pid": "Footwear_sandals_700d592bf0f0",
+      "query_category": "Footwear_sandals",
+      "supabase_top5_categories": [
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_sandals"
+      ],
+      "supabase_top5_pids": [
+        "Footwear_sandals_700d592bf0f0",
+        "Footwear_sandals_e7f3b92883d2",
+        "Footwear_sandals_e4051b68fac5",
+        "Footwear_sandals_f85eda940c43",
+        "Footwear_sandals_f5b7ce85b6cf"
+      ],
+      "category_matches": 5,
+      "supabase_latency_ms": 66.0
+    },
+    {
+      "query_pid": "Footwear_shoes_851e5a5b5a8a",
+      "query_category": "Footwear_shoes",
+      "supabase_top5_categories": [
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes"
+      ],
+      "supabase_top5_pids": [
+        "Footwear_shoes_851e5a5b5a8a",
+        "Footwear_shoes_da79b6dd2e0a",
+        "Footwear_shoes_5b5f3d134a52",
+        "Footwear_shoes_8596e6df6a7d",
+        "Footwear_shoes_b6fe95abed32"
+      ],
+      "category_matches": 5,
+      "supabase_latency_ms": 101.1
+    },
+    {
+      "query_pid": "necklace_aa3133996503",
+      "query_category": "necklace",
+      "supabase_top5_categories": [
+        "necklace",
+        "necklace",
+        "necklace",
+        "earrings",
+        "earrings"
+      ],
+      "supabase_top5_pids": [
+        "necklace_aa3133996503",
+        "necklace_164d7c2680e5",
+        "necklace_f0289f2332d5",
+        "earrings_4bed7adf346f",
+        "earrings_a236b26b720b"
+      ],
+      "category_matches": 3,
+      "supabase_latency_ms": 51.7
+    },
+    {
+      "query_pid": "dhoti_7eb1143788ae",
+      "query_category": "dhoti",
+      "supabase_top5_categories": [
+        "dhoti",
+        "dhoti",
+        "dhoti",
+        "dhoti",
+        "dhoti"
+      ],
+      "supabase_top5_pids": [
+        "dhoti_7eb1143788ae",
+        "dhoti_72186e4e3799",
+        "dhoti_bfc93a80fc82",
+        "dhoti_fd9d6eb637d8",
+        "dhoti_462385ebe6d0"
+      ],
+      "category_matches": 5,
+      "supabase_latency_ms": 74.2
+    },
+    {
+      "query_pid": "Footwear_shoes_bdf2f58c31d1",
+      "query_category": "Footwear_shoes",
+      "supabase_top5_categories": [
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes"
+      ],
+      "supabase_top5_pids": [
+        "Footwear_shoes_bdf2f58c31d1",
+        "Footwear_shoes_769c5e339d91",
+        "Footwear_shoes_07ed3933a5c4",
+        "Footwear_shoes_50d9272e5226",
+        "Footwear_shoes_5da40e43ecbf"
+      ],
+      "category_matches": 5,
+      "supabase_latency_ms": 68.4
+    }
+  ],
+  "summary": {
+    "total_queries": 10,
+    "top_k": 5,
+    "avg_category_match_pct": 94.0,
+    "avg_supabase_latency_ms": 72.2,
+    "max_supabase_latency_ms": 126.4,
+    "rank_comparison_matches": 3,
+    "pid_overlap_3_queries": 15
+  }
+}

@@ -1,0 +1,1624 @@
+{
+  "total_tested": 100,
+  "total_skipped": 0,
+  "total_pass": 36,
+  "total_fail": 64,
+  "pass_rate_pct": 36.0,
+  "no_detection": 3,
+  "no_detection_pct": 3.0,
+  "wrong_class": 57,
+  "wrong_class_pct": 57.0,
+  "low_confidence": 4,
+  "low_confidence_pct": 4.0,
+  "result_mismatch": 0,
+  "result_mismatch_pct": 0.0,
+  "avg_confidence": 0.818,
+  "most_confused_pairs": [
+    {
+      "expected": "Footwear_sandals",
+      "detected": "bag",
+      "count": 4
+    },
+    {
+      "expected": "blazer",
+      "detected": "pant",
+      "count": 3
+    },
+    {
+      "expected": "earrings",
+      "detected": "hairclip",
+      "count": 3
+    },
+    {
+      "expected": "Footwear_shoes",
+      "detected": "hairclip",
+      "count": 3
+    },
+    {
+      "expected": "skirt",
+      "detected": "Footwear_shoes",
+      "count": 3
+    },
+    {
+      "expected": "belt",
+      "detected": "bag",
+      "count": 2
+    },
+    {
+      "expected": "belt",
+      "detected": "bangle",
+      "count": 2
+    },
+    {
+      "expected": "Jacket",
+      "detected": "pant",
+      "count": 2
+    },
+    {
+      "expected": "necklace",
+      "detected": "bag",
+      "count": 2
+    },
+    {
+      "expected": "pant",
+      "detected": "dhoti",
+      "count": 2
+    }
+  ],
+  "confusion_matrix": {
+    "belt": {
+      "bag": 2,
+      "bangle": 2,
+      "caps": 1,
+      "shirts": 1
+    },
+    "blazer": {
+      "blazer": 2,
+      "pant": 3,
+      "shirts": 1
+    },
+    "caps": {
+      "caps": 5,
+      "bag": 1
+    },
+    "churidhar": {
+      "Footwear_sandals": 1,
+      "shirts": 1,
+      "Footwear_shoes": 1,
+      "churidhar": 2,
+      "pant": 1
+    },
+    "dhoti": {
+      "dhoti": 6
+    },
+    "earrings": {
+      "hairclip": 3,
+      "earrings": 2,
+      "NO_DETECTION": 1
+    },
+    "Footwear_sandals": {
+      "saree": 1,
+      "bag": 4,
+      "Footwear_shoes": 1
+    },
+    "Footwear_shoes": {
+      "hairclip": 3,
+      "bag": 1,
+      "pant": 1,
+      "purse": 1
+    },
+    "glasses": {
+      "glasses": 2,
+      "NO_DETECTION": 2,
+      "bangle": 1,
+      "hairclip": 1
+    },
+    "Jacket": {
+      "pant": 2,
+      "blazer": 1,
+      "necklace": 1,
+      "Jacket": 1,
+      "Footwear_shoes": 1
+    },
+    "necklace": {
+      "necklace": 2,
+      "bag": 2,
+      "hairclip": 1,
+      "bangle": 1
+    },
+    "pant": {
+      "dhoti": 2,
+      "shirts": 1,
+      "pant": 3
+    },
+    "shirts": {
+      "shirts": 4,
+      "caps": 1,
+      "blazer": 1
+    },
+    "shorts": {
+      "Footwear_shoes": 1,
+      "shorts": 4,
+      "shirts": 1
+    },
+    "skirt": {
+      "churidhar": 1,
+      "shirts": 1,
+      "dhoti": 1,
+      "Footwear_shoes": 3
+    },
+    "tie": {
+      "bag": 2,
+      "shawl": 1,
+      "hairclip": 1,
+      "bangle": 2
+    },
+    "tshirt": {
+      "tshirt": 4
+    }
+  },
+  "detailed_results": [
+    {
+      "pid": "belt_5c25173d96b6",
+      "expected": "belt",
+      "detected": "bag",
+      "conf": 0.792,
+      "top5_categories": [
+        "belt",
+        "belt",
+        "belt",
+        "belt",
+        "belt"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 13019.1
+    },
+    {
+      "pid": "belt_d27c72994440",
+      "expected": "belt",
+      "detected": "bangle",
+      "conf": 0.515,
+      "top5_categories": [
+        "belt",
+        "belt",
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_sandals"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 12156.8
+    },
+    {
+      "pid": "belt_1ee8b9a69f6b",
+      "expected": "belt",
+      "detected": "bangle",
+      "conf": 0.866,
+      "top5_categories": [
+        "belt",
+        "belt",
+        "belt",
+        "belt",
+        "belt"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 11529.9
+    },
+    {
+      "pid": "belt_0a7355b725ff",
+      "expected": "belt",
+      "detected": "bag",
+      "conf": 0.794,
+      "top5_categories": [
+        "belt",
+        "belt",
+        "belt",
+        "belt",
+        "belt"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 12451.0
+    },
+    {
+      "pid": "belt_4e412ab15c8a",
+      "expected": "belt",
+      "detected": "caps",
+      "conf": 0.916,
+      "top5_categories": [
+        "belt",
+        "belt",
+        "belt",
+        "belt",
+        "belt"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 11322.1
+    },
+    {
+      "pid": "belt_6eda8fe8da3a",
+      "expected": "belt",
+      "detected": "shirts",
+      "conf": 0.736,
+      "top5_categories": [
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 12398.3
+    },
+    {
+      "pid": "blazer_74bd46e97d8b",
+      "expected": "blazer",
+      "detected": "blazer",
+      "conf": 0.988,
+      "top5_categories": [
+        "blazer",
+        "blazer",
+        "blazer",
+        "blazer",
+        "blazer"
+      ],
+      "status": "PASS",
+      "latency_ms": 13626.5
+    },
+    {
+      "pid": "blazer_74d48d1a1a7a",
+      "expected": "blazer",
+      "detected": "pant",
+      "conf": 0.843,
+      "top5_categories": [
+        "pant",
+        "pant",
+        "pant",
+        "pant",
+        "pant"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 11497.3
+    },
+    {
+      "pid": "blazer_d2ef5ec5c165",
+      "expected": "blazer",
+      "detected": "shirts",
+      "conf": 0.893,
+      "top5_categories": [
+        "watch",
+        "earrings",
+        "skirt",
+        "watch",
+        "earrings"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 11030.2
+    },
+    {
+      "pid": "blazer_0e2837d51580",
+      "expected": "blazer",
+      "detected": "blazer",
+      "conf": 0.973,
+      "top5_categories": [
+        "blazer",
+        "blazer",
+        "blazer",
+        "blazer",
+        "blazer"
+      ],
+      "status": "PASS",
+      "latency_ms": 12527.3
+    },
+    {
+      "pid": "blazer_6fd1c7bc263e",
+      "expected": "blazer",
+      "detected": "pant",
+      "conf": 0.978,
+      "top5_categories": [
+        "pant",
+        "pant",
+        "pant",
+        "pant",
+        "pant"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 11805.7
+    },
+    {
+      "pid": "blazer_776f0b1d07dd",
+      "expected": "blazer",
+      "detected": "pant",
+      "conf": 0.906,
+      "top5_categories": [
+        "pant",
+        "pant",
+        "pant",
+        "pant",
+        "pant"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 12575.8
+    },
+    {
+      "pid": "caps_9180dee2b3d7",
+      "expected": "caps",
+      "detected": "caps",
+      "conf": 0.865,
+      "top5_categories": [
+        "caps",
+        "caps",
+        "caps",
+        "caps",
+        "caps"
+      ],
+      "status": "PASS",
+      "latency_ms": 12611.3
+    },
+    {
+      "pid": "caps_fe40b7069956",
+      "expected": "caps",
+      "detected": "caps",
+      "conf": 0.854,
+      "top5_categories": [
+        "caps",
+        "caps",
+        "caps",
+        "caps",
+        "caps"
+      ],
+      "status": "PASS",
+      "latency_ms": 12405.5
+    },
+    {
+      "pid": "caps_6d156b164c07",
+      "expected": "caps",
+      "detected": "caps",
+      "conf": 0.923,
+      "top5_categories": [
+        "caps",
+        "caps",
+        "caps",
+        "caps",
+        "caps"
+      ],
+      "status": "PASS",
+      "latency_ms": 13705.7
+    },
+    {
+      "pid": "caps_bb7dfb5eccf5",
+      "expected": "caps",
+      "detected": "caps",
+      "conf": 0.743,
+      "top5_categories": [
+        "caps",
+        "caps",
+        "caps",
+        "caps",
+        "caps"
+      ],
+      "status": "PASS",
+      "latency_ms": 11407.9
+    },
+    {
+      "pid": "caps_7f68b286e732",
+      "expected": "caps",
+      "detected": "caps",
+      "conf": 0.933,
+      "top5_categories": [
+        "caps",
+        "caps",
+        "caps",
+        "caps",
+        "caps"
+      ],
+      "status": "PASS",
+      "latency_ms": 11405.5
+    },
+    {
+      "pid": "caps_811006de7432",
+      "expected": "caps",
+      "detected": "bag",
+      "conf": 0.754,
+      "top5_categories": [
+        "caps",
+        "caps",
+        "caps",
+        "caps",
+        "caps"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 12269.9
+    },
+    {
+      "pid": "churidhar_dc0cb3464929",
+      "expected": "churidhar",
+      "detected": "Footwear_sandals",
+      "conf": 0.899,
+      "top5_categories": [
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_sandals"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 11715.0
+    },
+    {
+      "pid": "churidhar_27d29948612e",
+      "expected": "churidhar",
+      "detected": "shirts",
+      "conf": 0.785,
+      "top5_categories": [
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 11983.9
+    },
+    {
+      "pid": "churidhar_5fdd5831ef62",
+      "expected": "churidhar",
+      "detected": "Footwear_shoes",
+      "conf": 0.894,
+      "top5_categories": [
+        "Footwear_shoes"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 13669.9
+    },
+    {
+      "pid": "churidhar_93cff010b71c",
+      "expected": "churidhar",
+      "detected": "churidhar",
+      "conf": 0.913,
+      "top5_categories": [
+        "churidhar",
+        "churidhar",
+        "churidhar",
+        "churidhar",
+        "churidhar"
+      ],
+      "status": "PASS",
+      "latency_ms": 11120.2
+    },
+    {
+      "pid": "churidhar_b497fbee4551",
+      "expected": "churidhar",
+      "detected": "churidhar",
+      "conf": 0.896,
+      "top5_categories": [
+        "churidhar",
+        "churidhar",
+        "churidhar",
+        "churidhar",
+        "churidhar"
+      ],
+      "status": "PASS",
+      "latency_ms": 10840.9
+    },
+    {
+      "pid": "churidhar_427f5fd68349",
+      "expected": "churidhar",
+      "detected": "pant",
+      "conf": 0.78,
+      "top5_categories": [
+        "tie",
+        "tshirt",
+        "tie",
+        "Footwear_shoes",
+        "earrings"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 10771.1
+    },
+    {
+      "pid": "dhoti_25af94cbc899",
+      "expected": "dhoti",
+      "detected": "dhoti",
+      "conf": 0.888,
+      "top5_categories": [
+        "dhoti",
+        "dhoti",
+        "dhoti",
+        "dhoti",
+        "dhoti"
+      ],
+      "status": "PASS",
+      "latency_ms": 10501.3
+    },
+    {
+      "pid": "dhoti_5a6a4674ef9c",
+      "expected": "dhoti",
+      "detected": "dhoti",
+      "conf": 0.924,
+      "top5_categories": [
+        "dhoti",
+        "dhoti",
+        "dhoti",
+        "dhoti",
+        "dhoti"
+      ],
+      "status": "PASS",
+      "latency_ms": 12265.9
+    },
+    {
+      "pid": "dhoti_ebc7391a49da",
+      "expected": "dhoti",
+      "detected": "dhoti",
+      "conf": 0.834,
+      "top5_categories": [
+        "dhoti",
+        "dhoti",
+        "dhoti",
+        "dhoti",
+        "dhoti"
+      ],
+      "status": "PASS",
+      "latency_ms": 10005.3
+    },
+    {
+      "pid": "dhoti_ff6b79807e80",
+      "expected": "dhoti",
+      "detected": "dhoti",
+      "conf": 0.88,
+      "top5_categories": [
+        "dhoti",
+        "dhoti",
+        "dhoti",
+        "dhoti",
+        "dhoti"
+      ],
+      "status": "PASS",
+      "latency_ms": 10169.4
+    },
+    {
+      "pid": "dhoti_b75414dd8a81",
+      "expected": "dhoti",
+      "detected": "dhoti",
+      "conf": 0.882,
+      "top5_categories": [
+        "dhoti",
+        "dhoti",
+        "dhoti",
+        "dhoti",
+        "dhoti"
+      ],
+      "status": "PASS",
+      "latency_ms": 9584.7
+    },
+    {
+      "pid": "dhoti_544d4dd43936",
+      "expected": "dhoti",
+      "detected": "dhoti",
+      "conf": 0.905,
+      "top5_categories": [
+        "dhoti",
+        "dhoti",
+        "dhoti",
+        "dhoti",
+        "dhoti"
+      ],
+      "status": "PASS",
+      "latency_ms": 10594.1
+    },
+    {
+      "pid": "earrings_3e2b2b623a98",
+      "expected": "earrings",
+      "detected": "hairclip",
+      "conf": 0.721,
+      "top5_categories": [
+        "earrings",
+        "earrings",
+        "shirts",
+        "glasses",
+        "glasses"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 12242.2
+    },
+    {
+      "pid": "earrings_8aaddcf22f4e",
+      "expected": "earrings",
+      "detected": "earrings",
+      "conf": 0.893,
+      "top5_categories": [
+        "earrings",
+        "earrings",
+        "earrings",
+        "earrings",
+        "earrings"
+      ],
+      "status": "PASS",
+      "latency_ms": 10566.1
+    },
+    {
+      "pid": "earrings_81b2ab090f65",
+      "expected": "earrings",
+      "detected": "earrings",
+      "conf": 0.459,
+      "top5_categories": [
+        "earrings",
+        "earrings",
+        "earrings",
+        "earrings",
+        "earrings"
+      ],
+      "status": "LOW_CONFIDENCE",
+      "latency_ms": 9793.7
+    },
+    {
+      "pid": "earrings_39a1e95b081c",
+      "expected": "earrings",
+      "detected": "hairclip",
+      "conf": 0.67,
+      "top5_categories": [
+        "earrings",
+        "earrings",
+        "earrings",
+        "earrings",
+        "earrings"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 9781.2
+    },
+    {
+      "pid": "earrings_9fb9a2933bf5",
+      "expected": "earrings",
+      "detected": null,
+      "conf": 0,
+      "status": "NO_DETECTION",
+      "latency_ms": 9402.7
+    },
+    {
+      "pid": "earrings_7b70ca17e5f8",
+      "expected": "earrings",
+      "detected": "hairclip",
+      "conf": 0.654,
+      "top5_categories": [
+        "earrings",
+        "earrings",
+        "earrings",
+        "caps",
+        "glasses"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 9915.3
+    },
+    {
+      "pid": "Footwear_sandals_4b734bdf1856",
+      "expected": "Footwear_sandals",
+      "detected": "saree",
+      "conf": 0.659,
+      "top5_categories": [
+        "Footwear_sandals",
+        "necklace",
+        "watch",
+        "necklace",
+        "watch"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 9774.9
+    },
+    {
+      "pid": "Footwear_sandals_95a70320fbe2",
+      "expected": "Footwear_sandals",
+      "detected": "bag",
+      "conf": 0.73,
+      "top5_categories": [
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_sandals"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 10003.7
+    },
+    {
+      "pid": "Footwear_sandals_13e34c9f184d",
+      "expected": "Footwear_sandals",
+      "detected": "bag",
+      "conf": 0.952,
+      "top5_categories": [
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_sandals"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 9814.3
+    },
+    {
+      "pid": "Footwear_sandals_94c55abd3f5b",
+      "expected": "Footwear_sandals",
+      "detected": "bag",
+      "conf": 0.69,
+      "top5_categories": [
+        "Footwear_shoes",
+        "tie",
+        "caps",
+        "caps",
+        "glasses"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 9606.6
+    },
+    {
+      "pid": "Footwear_sandals_975b2ee2b2c1",
+      "expected": "Footwear_sandals",
+      "detected": "bag",
+      "conf": 0.443,
+      "top5_categories": [
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_sandals",
+        "Footwear_sandals"
+      ],
+      "status": "LOW_CONFIDENCE",
+      "latency_ms": 10187.3
+    },
+    {
+      "pid": "Footwear_sandals_cc5c6ea368c0",
+      "expected": "Footwear_sandals",
+      "detected": "Footwear_shoes",
+      "conf": 0.631,
+      "top5_categories": [
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 12775.8
+    },
+    {
+      "pid": "Footwear_shoes_a945879157fb",
+      "expected": "Footwear_shoes",
+      "detected": "hairclip",
+      "conf": 0.751,
+      "top5_categories": [
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 9722.3
+    },
+    {
+      "pid": "Footwear_shoes_99df3ee553d9",
+      "expected": "Footwear_shoes",
+      "detected": "bag",
+      "conf": 0.923,
+      "top5_categories": [
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_sandals",
+        "Footwear_shoes",
+        "Footwear_shoes"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 10876.3
+    },
+    {
+      "pid": "Footwear_shoes_a836a51e0219",
+      "expected": "Footwear_shoes",
+      "detected": "pant",
+      "conf": 0.897,
+      "top5_categories": [
+        "pant",
+        "pant",
+        "pant",
+        "pant",
+        "pant"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 9862.6
+    },
+    {
+      "pid": "Footwear_shoes_885e131c64e5",
+      "expected": "Footwear_shoes",
+      "detected": "hairclip",
+      "conf": 0.948,
+      "top5_categories": [
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 9828.0
+    },
+    {
+      "pid": "Footwear_shoes_dcffbb077f88",
+      "expected": "Footwear_shoes",
+      "detected": "hairclip",
+      "conf": 0.889,
+      "top5_categories": [
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 9906.5
+    },
+    {
+      "pid": "Footwear_shoes_a34d85afd514",
+      "expected": "Footwear_shoes",
+      "detected": "purse",
+      "conf": 0.834,
+      "top5_categories": [
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_sandals",
+        "Footwear_shoes",
+        "Footwear_shoes"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 10972.8
+    },
+    {
+      "pid": "glasses_064d526c2210",
+      "expected": "glasses",
+      "detected": "glasses",
+      "conf": 0.538,
+      "top5_categories": [
+        "glasses",
+        "glasses",
+        "glasses",
+        "glasses",
+        "glasses"
+      ],
+      "status": "PASS",
+      "latency_ms": 10243.7
+    },
+    {
+      "pid": "glasses_f8d7e9376d1c",
+      "expected": "glasses",
+      "detected": null,
+      "conf": 0,
+      "status": "NO_DETECTION",
+      "latency_ms": 10956.4
+    },
+    {
+      "pid": "glasses_bf11aa1b2564",
+      "expected": "glasses",
+      "detected": "bangle",
+      "conf": 0.743,
+      "top5_categories": [
+        "belt",
+        "belt",
+        "belt",
+        "belt",
+        "belt"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 10216.2
+    },
+    {
+      "pid": "glasses_1e4f7724c329",
+      "expected": "glasses",
+      "detected": null,
+      "conf": 0,
+      "status": "NO_DETECTION",
+      "latency_ms": 9578.4
+    },
+    {
+      "pid": "glasses_4003d89d0b70",
+      "expected": "glasses",
+      "detected": "glasses",
+      "conf": 0.817,
+      "top5_categories": [
+        "glasses",
+        "glasses",
+        "glasses",
+        "glasses",
+        "glasses"
+      ],
+      "status": "PASS",
+      "latency_ms": 9935.4
+    },
+    {
+      "pid": "glasses_f8476d1c4f3b",
+      "expected": "glasses",
+      "detected": "hairclip",
+      "conf": 0.546,
+      "top5_categories": [
+        "glasses",
+        "glasses",
+        "glasses",
+        "glasses",
+        "glasses"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 11709.5
+    },
+    {
+      "pid": "Jacket_a60b90d97045",
+      "expected": "Jacket",
+      "detected": "pant",
+      "conf": 0.962,
+      "top5_categories": [
+        "pant",
+        "pant",
+        "pant",
+        "pant",
+        "pant"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 11453.8
+    },
+    {
+      "pid": "Jacket_5db4852ba071",
+      "expected": "Jacket",
+      "detected": "pant",
+      "conf": 0.879,
+      "top5_categories": [
+        "pant",
+        "pant",
+        "pant",
+        "pant",
+        "pant"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 9938.0
+    },
+    {
+      "pid": "Jacket_fc8102465ebb",
+      "expected": "Jacket",
+      "detected": "blazer",
+      "conf": 0.864,
+      "top5_categories": [
+        "blazer",
+        "blazer",
+        "blazer",
+        "blazer",
+        "blazer"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 28786.3
+    },
+    {
+      "pid": "Jacket_b742b138c23f",
+      "expected": "Jacket",
+      "detected": "necklace",
+      "conf": 0.82,
+      "top5_categories": [
+        "necklace",
+        "necklace",
+        "necklace",
+        "necklace",
+        "necklace"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 10142.5
+    },
+    {
+      "pid": "Jacket_f9f21c001e5d",
+      "expected": "Jacket",
+      "detected": "Jacket",
+      "conf": 0.991,
+      "top5_categories": [
+        "Jacket",
+        "Jacket",
+        "Jacket",
+        "Jacket",
+        "Jacket"
+      ],
+      "status": "PASS",
+      "latency_ms": 9851.2
+    },
+    {
+      "pid": "Jacket_b61e8faeed48",
+      "expected": "Jacket",
+      "detected": "Footwear_shoes",
+      "conf": 0.783,
+      "top5_categories": [
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 10902.3
+    },
+    {
+      "pid": "necklace_caefc43f2d9c",
+      "expected": "necklace",
+      "detected": "necklace",
+      "conf": 0.757,
+      "top5_categories": [
+        "necklace",
+        "necklace",
+        "necklace",
+        "necklace",
+        "necklace"
+      ],
+      "status": "PASS",
+      "latency_ms": 10651.3
+    },
+    {
+      "pid": "necklace_39c4c0afd06a",
+      "expected": "necklace",
+      "detected": "bag",
+      "conf": 0.391,
+      "top5_categories": [
+        "necklace",
+        "necklace",
+        "necklace",
+        "necklace",
+        "necklace"
+      ],
+      "status": "LOW_CONFIDENCE",
+      "latency_ms": 11544.3
+    },
+    {
+      "pid": "necklace_02e2eb60a43f",
+      "expected": "necklace",
+      "detected": "hairclip",
+      "conf": 0.543,
+      "top5_categories": [
+        "necklace",
+        "necklace",
+        "necklace",
+        "necklace",
+        "necklace"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 11049.1
+    },
+    {
+      "pid": "necklace_3c232db6ea31",
+      "expected": "necklace",
+      "detected": "necklace",
+      "conf": 0.916,
+      "top5_categories": [
+        "necklace",
+        "necklace",
+        "necklace",
+        "necklace",
+        "necklace"
+      ],
+      "status": "PASS",
+      "latency_ms": 10825.1
+    },
+    {
+      "pid": "necklace_1fd7cd724702",
+      "expected": "necklace",
+      "detected": "bag",
+      "conf": 0.723,
+      "top5_categories": [
+        "necklace",
+        "necklace",
+        "necklace",
+        "necklace",
+        "necklace"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 13292.6
+    },
+    {
+      "pid": "necklace_ae73eb9db589",
+      "expected": "necklace",
+      "detected": "bangle",
+      "conf": 0.651,
+      "top5_categories": [
+        "necklace",
+        "necklace",
+        "necklace",
+        "necklace",
+        "necklace"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 13623.1
+    },
+    {
+      "pid": "pant_cdb6e53a6642",
+      "expected": "pant",
+      "detected": "dhoti",
+      "conf": 0.901,
+      "top5_categories": [
+        "dhoti",
+        "dhoti",
+        "dhoti",
+        "dhoti",
+        "dhoti"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 12914.6
+    },
+    {
+      "pid": "pant_cf809fd16e77",
+      "expected": "pant",
+      "detected": "shirts",
+      "conf": 0.898,
+      "top5_categories": [
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 17069.7
+    },
+    {
+      "pid": "pant_7742664b2b25",
+      "expected": "pant",
+      "detected": "dhoti",
+      "conf": 0.754,
+      "top5_categories": [
+        "pant",
+        "pant",
+        "pant",
+        "pant",
+        "pant"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 12774.2
+    },
+    {
+      "pid": "pant_2bc3481b3305",
+      "expected": "pant",
+      "detected": "pant",
+      "conf": 0.921,
+      "top5_categories": [
+        "pant",
+        "pant",
+        "pant",
+        "pant",
+        "pant"
+      ],
+      "status": "PASS",
+      "latency_ms": 13993.7
+    },
+    {
+      "pid": "pant_1843023d71d2",
+      "expected": "pant",
+      "detected": "pant",
+      "conf": 0.963,
+      "top5_categories": [
+        "pant",
+        "pant",
+        "pant",
+        "pant",
+        "pant"
+      ],
+      "status": "PASS",
+      "latency_ms": 13237.5
+    },
+    {
+      "pid": "pant_010ce589ea5d",
+      "expected": "pant",
+      "detected": "pant",
+      "conf": 0.928,
+      "top5_categories": [
+        "pant",
+        "pant",
+        "pant",
+        "pant",
+        "pant"
+      ],
+      "status": "PASS",
+      "latency_ms": 13515.5
+    },
+    {
+      "pid": "shirts_7812a8d4ca5a",
+      "expected": "shirts",
+      "detected": "shirts",
+      "conf": 0.969,
+      "top5_categories": [
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts"
+      ],
+      "status": "PASS",
+      "latency_ms": 13694.1
+    },
+    {
+      "pid": "shirts_0744c074f499",
+      "expected": "shirts",
+      "detected": "caps",
+      "conf": 0.792,
+      "top5_categories": [
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 13601.1
+    },
+    {
+      "pid": "shirts_1c03b1aac0d7",
+      "expected": "shirts",
+      "detected": "shirts",
+      "conf": 0.888,
+      "top5_categories": [
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts"
+      ],
+      "status": "PASS",
+      "latency_ms": 14333.3
+    },
+    {
+      "pid": "shirts_9cfb7c52f647",
+      "expected": "shirts",
+      "detected": "shirts",
+      "conf": 0.84,
+      "top5_categories": [
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts"
+      ],
+      "status": "PASS",
+      "latency_ms": 13528.7
+    },
+    {
+      "pid": "shirts_57451da617a0",
+      "expected": "shirts",
+      "detected": "shirts",
+      "conf": 0.894,
+      "top5_categories": [
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts"
+      ],
+      "status": "PASS",
+      "latency_ms": 13547.3
+    },
+    {
+      "pid": "shirts_7b001d8f0589",
+      "expected": "shirts",
+      "detected": "blazer",
+      "conf": 0.816,
+      "top5_categories": [
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 13823.1
+    },
+    {
+      "pid": "shorts_22575f41a3d2",
+      "expected": "shorts",
+      "detected": "Footwear_shoes",
+      "conf": 0.904,
+      "top5_categories": [
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 13651.3
+    },
+    {
+      "pid": "shorts_b6246224d284",
+      "expected": "shorts",
+      "detected": "shorts",
+      "conf": 0.892,
+      "top5_categories": [
+        "shorts",
+        "shorts",
+        "shorts",
+        "shorts",
+        "shorts"
+      ],
+      "status": "PASS",
+      "latency_ms": 12595.2
+    },
+    {
+      "pid": "shorts_cd50dc075eda",
+      "expected": "shorts",
+      "detected": "shirts",
+      "conf": 0.912,
+      "top5_categories": [
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 13269.1
+    },
+    {
+      "pid": "shorts_0292fee5c02e",
+      "expected": "shorts",
+      "detected": "shorts",
+      "conf": 0.951,
+      "top5_categories": [
+        "shorts",
+        "shorts",
+        "shorts",
+        "shorts",
+        "shorts"
+      ],
+      "status": "PASS",
+      "latency_ms": 15150.9
+    },
+    {
+      "pid": "shorts_b058472ad159",
+      "expected": "shorts",
+      "detected": "shorts",
+      "conf": 0.941,
+      "top5_categories": [
+        "shorts",
+        "shorts",
+        "shorts"
+      ],
+      "status": "PASS",
+      "latency_ms": 13580.0
+    },
+    {
+      "pid": "shorts_9a10fae3336f",
+      "expected": "shorts",
+      "detected": "shorts",
+      "conf": 0.955,
+      "top5_categories": [
+        "shorts",
+        "shorts",
+        "shorts",
+        "shorts",
+        "shorts"
+      ],
+      "status": "PASS",
+      "latency_ms": 10753.0
+    },
+    {
+      "pid": "skirt_422b6725dd78",
+      "expected": "skirt",
+      "detected": "churidhar",
+      "conf": 0.574,
+      "top5_categories": [
+        "churidhar",
+        "churidhar",
+        "churidhar",
+        "churidhar",
+        "churidhar"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 10342.2
+    },
+    {
+      "pid": "skirt_d63e63d9bbaf",
+      "expected": "skirt",
+      "detected": "shirts",
+      "conf": 0.79,
+      "top5_categories": [
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts",
+        "shirts"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 9220.3
+    },
+    {
+      "pid": "skirt_1d2d84c3d5c1",
+      "expected": "skirt",
+      "detected": "dhoti",
+      "conf": 0.918,
+      "top5_categories": [
+        "dhoti"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 9253.9
+    },
+    {
+      "pid": "skirt_786dc67a0f6a",
+      "expected": "skirt",
+      "detected": "Footwear_shoes",
+      "conf": 0.753,
+      "top5_categories": [
+        "Footwear_shoes"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 9318.6
+    },
+    {
+      "pid": "skirt_cc5edb2f8aec",
+      "expected": "skirt",
+      "detected": "Footwear_shoes",
+      "conf": 0.843,
+      "top5_categories": [
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 10204.4
+    },
+    {
+      "pid": "skirt_b0325d1b177e",
+      "expected": "skirt",
+      "detected": "Footwear_shoes",
+      "conf": 0.883,
+      "top5_categories": [
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes",
+        "Footwear_shoes"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 10703.2
+    },
+    {
+      "pid": "tie_8c9707567c0a",
+      "expected": "tie",
+      "detected": "bag",
+      "conf": 0.877,
+      "top5_categories": [
+        "tie",
+        "tie",
+        "tie",
+        "tie",
+        "tie"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 11459.6
+    },
+    {
+      "pid": "tie_29bb92d5fcb9",
+      "expected": "tie",
+      "detected": "shawl",
+      "conf": 0.558,
+      "top5_categories": [
+        "tie",
+        "tie",
+        "tie",
+        "tie",
+        "tie"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 12196.2
+    },
+    {
+      "pid": "tie_a045b4c4aa88",
+      "expected": "tie",
+      "detected": "hairclip",
+      "conf": 0.797,
+      "top5_categories": [
+        "tie",
+        "tie",
+        "tie",
+        "tie",
+        "tie"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 9839.3
+    },
+    {
+      "pid": "tie_06a6f54b3a37",
+      "expected": "tie",
+      "detected": "bangle",
+      "conf": 0.411,
+      "top5_categories": [
+        "tie",
+        "tie",
+        "tie",
+        "tie",
+        "tie"
+      ],
+      "status": "LOW_CONFIDENCE",
+      "latency_ms": 11188.5
+    },
+    {
+      "pid": "tie_1824282c08e6",
+      "expected": "tie",
+      "detected": "bag",
+      "conf": 0.733,
+      "top5_categories": [
+        "tie",
+        "tie",
+        "tie",
+        "tie",
+        "tie"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 10105.8
+    },
+    {
+      "pid": "tie_7454d0d9e8ff",
+      "expected": "tie",
+      "detected": "bangle",
+      "conf": 0.892,
+      "top5_categories": [
+        "tie",
+        "tie",
+        "tie",
+        "tie",
+        "tie"
+      ],
+      "status": "WRONG_CLASS",
+      "latency_ms": 10359.9
+    },
+    {
+      "pid": "tshirt_f7b2bb6785dd",
+      "expected": "tshirt",
+      "detected": "tshirt",
+      "conf": 0.823,
+      "top5_categories": [
+        "tshirt",
+        "tshirt",
+        "tshirt",
+        "tshirt",
+        "tshirt"
+      ],
+      "status": "PASS",
+      "latency_ms": 9677.7
+    },
+    {
+      "pid": "tshirt_51a652718a39",
+      "expected": "tshirt",
+      "detected": "tshirt",
+      "conf": 0.956,
+      "top5_categories": [
+        "tshirt",
+        "tshirt",
+        "tshirt",
+        "tshirt",
+        "tshirt"
+      ],
+      "status": "PASS",
+      "latency_ms": 11223.3
+    },
+    {
+      "pid": "tshirt_90b15c96bb83",
+      "expected": "tshirt",
+      "detected": "tshirt",
+      "conf": 0.991,
+      "top5_categories": [
+        "tshirt",
+        "tshirt",
+        "tshirt",
+        "tshirt",
+        "tshirt"
+      ],
+      "status": "PASS",
+      "latency_ms": 10274.1
+    },
+    {
+      "pid": "tshirt_7be066f7661d",
+      "expected": "tshirt",
+      "detected": "tshirt",
+      "conf": 0.969,
+      "top5_categories": [
+        "tshirt",
+        "tshirt",
+        "tshirt",
+        "tshirt",
+        "tshirt"
+      ],
+      "status": "PASS",
+      "latency_ms": 9741.1
+    }
+  ]
+}

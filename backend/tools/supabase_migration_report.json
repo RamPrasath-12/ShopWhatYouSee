@@ -1,0 +1,8 @@
+{
+  "inserted_rows": 34787,
+  "index_build_time_s": 5.8,
+  "analyze_time_s": 2.7,
+  "supabase_rows": 34787,
+  "count_match": true,
+  "avg_query_latency_ms": 75.4
+}
