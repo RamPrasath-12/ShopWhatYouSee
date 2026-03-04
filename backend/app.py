@@ -4,7 +4,9 @@ from models.yolo_detector import YoloDetector
 from config import YOLO_MODELS, YOLO_CONF_THRESH
 from models.agman_extractor import process_crop_base64
 from models.scene_context import SceneContextDetector
+from models.explanation_generator import generate_explanations
 from models.gemini_reasoner import GeminiReasoner
+from services.analytics_logger import log_event, parse_device_type, hash_user_id, shutdown as analytics_shutdown
 from flask_cors import CORS, cross_origin
 
 from models.product_retrieval import search_products_v2
@@ -183,7 +185,37 @@ def detect():
     for i, d in enumerate(detections):
         print(f"  [{i}] {d['class']} ({d['conf']:.2f})")
 
-    return jsonify({"detections": detections})
+    # Run scene detection on the SAME full frame (no extra API call needed)
+    scene_result = None
+    try:
+        scene_result = scene_detector.infer(img_b64)
+        log_step("SCENE DETECTED (inline)", scene_result)
+    except Exception as e:
+        print(f"[Scene] Inline scene detection failed (non-critical): {e}")
+
+    # ── Analytics: log detection request (every frame, even 0 detections) ──
+    log_event("detection_request",
+        session_id=data.get("session_id"),
+        result_count=len(detections),
+        scene_label=scene_result.get("scene_label") if scene_result else None,
+        user_agent=request.headers.get("User-Agent"),
+        device_type=parse_device_type(request.headers.get("User-Agent", "")),
+    )
+    # Log each individual detection
+    for d in detections:
+        log_event("detection",
+            session_id=data.get("session_id"),
+            detected_category=d.get("class"),
+            yolo_confidence=d.get("conf"),
+            scene_label=scene_result.get("scene_label") if scene_result else None,
+            user_agent=request.headers.get("User-Agent"),
+            device_type=parse_device_type(request.headers.get("User-Agent", "")),
+        )
+
+    return jsonify({
+        "detections": detections,
+        "scene": scene_result,
+    })
 
 @app.route('/extract-attributes', methods=['POST'])
 def extract_attributes():
@@ -201,7 +233,18 @@ def extract_attributes():
     result = process_crop_base64(b64, category)
     
     log_step("AGMAN RESULT", result.get('attributes'))
-    
+
+    # ── Analytics: log extraction event ──
+    attrs = result.get('attributes', {})
+    log_event("attribute_extraction",
+        session_id=data.get("session_id"),
+        detected_category=category,
+        detected_color=attrs.get("color_name"),
+        detected_pattern=attrs.get("pattern"),
+        detected_sleeve=attrs.get("sleeve"),
+        extraction_quality=result.get("quality"),
+    )
+
     return jsonify(result)
 
 @app.route('/scene', methods=['POST'])
@@ -276,56 +319,77 @@ def llm_route():
             session_history=normalized_history,
         )
 
-        raw_filters = llm_result.get("filters", {})
+        # ---- Step 2: Extract add/remove/reset from LLM result ----
+        # New schema: {add, remove, reset_to_visual}
+        # Legacy compat: if result has "filters" (old schema), convert it
+        if "add" in llm_result:
+            raw_add = llm_result.get("add", {})
+            remove_keys = llm_result.get("remove", [])
+            reset_to_visual = llm_result.get("reset_to_visual", False)
+        elif "filters" in llm_result:
+            # Legacy format — treat all filters as "add"
+            raw_add = llm_result.get("filters", {})
+            remove_keys = []
+            reset_to_visual = False
+        else:
+            raw_add = {}
+            remove_keys = []
+            reset_to_visual = False
+
         price_max = llm_result.get("price_max")
         confidence = llm_result.get("confidence", 0.0)
         source = llm_result.get("source", "unknown")
 
         log_step(f"LLM RAW ({source.upper()})", {
-            "filters": raw_filters,
+            "add": raw_add,
+            "remove": remove_keys,
+            "reset_to_visual": reset_to_visual,
             "price_max": price_max,
             "confidence": confidence
         })
 
-        # ---- Step 2: Price Normalization ----
-        # Convert numeric price_max to price_bucket (deterministic)
-        if price_max is not None and "price_bucket" not in raw_filters:
+        # ---- Step 3: Price Normalization ----
+        if price_max is not None and "price_bucket" not in raw_add:
             bucket = filter_schema.price_to_bucket(price_max)
             if bucket:
-                raw_filters["price_bucket"] = bucket
+                raw_add["price_bucket"] = bucket
                 print(f"  [Price] {price_max} -> {bucket}")
 
-        # ---- Step 3: Validate against DB-sourced allowed values ----
-        validated_filters = filter_schema.validate(raw_filters)
+        # ---- Step 4: Validate 'add' against DB-sourced allowed values ----
+        validated_add = filter_schema.validate(raw_add)
 
-        # ---- Step 4: Category Precedence ----
-        llm_category = validated_filters.get("category")
+        # ---- Step 5: Category Precedence (within 'add' only) ----
+        llm_category = validated_add.get("category")
 
         if is_image_search and yolo_category:
-            # Image search: YOLO wins.
-            # LLM override only if confidence > 0.9 AND same category group.
             if (llm_category
                     and llm_category != yolo_category
                     and confidence > 0.9
                     and filter_schema.same_category_group(llm_category, yolo_category)):
-                validated_filters["category"] = llm_category
+                validated_add["category"] = llm_category
                 print(f"  [Category] LLM override accepted: {yolo_category} -> {llm_category} (conf={confidence})")
             else:
-                validated_filters["category"] = yolo_category
+                validated_add["category"] = yolo_category
                 if llm_category and llm_category != yolo_category:
                     print(f"  [Category] LLM override REJECTED: LLM={llm_category}, YOLO={yolo_category} (conf={confidence})")
         elif llm_category:
-            # Text-only: LLM defines category
-            validated_filters["category"] = llm_category
-        # If neither specifies category, do NOT inject one
+            validated_add["category"] = llm_category
 
-        log_step("LLM VALIDATED FILTERS", validated_filters)
+        log_step("LLM VALIDATED", {
+            "add": validated_add,
+            "remove": remove_keys,
+            "reset_to_visual": reset_to_visual
+        })
 
-        # ---- Log confidence for monitoring ----
         print(f"  [LLM Confidence] {confidence} (source={source})")
 
         return jsonify({
-            "filters": validated_filters,
+            # New schema fields
+            "add": validated_add,
+            "remove": remove_keys,
+            "reset_to_visual": reset_to_visual,
+            # Backward compat: filters = add (for any legacy consumer)
+            "filters": validated_add,
             "price_max": price_max,
             "confidence": confidence,
             "llm_source": source,
@@ -336,12 +400,14 @@ def llm_route():
 
     except Exception as e:
         print(f"LLM ERROR: {e}")
-        # Hard fail-safe: return YOLO category only
         fallback = {}
         if yolo_category:
             fallback["category"] = yolo_category
 
         return jsonify({
+            "add": fallback,
+            "remove": [],
+            "reset_to_visual": False,
             "filters": fallback,
             "confidence": 0.0,
             "llm_source": "error",
@@ -370,61 +436,81 @@ def search_api():
     body = request.get_json() or {}
 
     embedding = body.get("embedding")
-    filters = body.get("filters", {})
-    detected_category = body.get("detected_category")
-    target_category = body.get("target_category")
     top_k = body.get("top_k", 20)
-    price_max = body.get("price_max")  # Numeric price cap from LLM
-    
-    # Detected attributes from AG-MAN (original visual detection)
-    detected_attributes = body.get("detected_attributes", {})
-    
-    # Ensure detected_attributes has at least the category
-    if not detected_attributes.get("category") and detected_category:
-        detected_attributes["category"] = detected_category
+    price_max = body.get("price_max")
+    detected_category = body.get("detected_category")
+    scene_label = body.get("scene")  # Scene context from Places365
 
-    # Build user_filters from various sources
-    # Priority: explicit user_filters > flat filters > hard/soft constraints
-    user_filters = body.get("user_filters", {})
-    if not user_filters:
-        # Convert legacy hard_constraints / soft_preferences to flat user_filters
-        hc = body.get("hard_constraints", {})
-        sp = body.get("soft_preferences", {})
-        if hc or sp:
-            for key, val in {**hc, **sp}.items():
-                if isinstance(val, dict):
-                    user_filters[key] = val.get("value", "")
-                elif val:
-                    user_filters[key] = val
-        elif filters:
-            # Fallback to flat filters dict
-            user_filters = {k: v for k, v in filters.items() if v}
-    
-    # Category override: target_category > user_filters.category > filters.category
-    if target_category:
-        user_filters["category"] = target_category
-    elif not user_filters.get("category") and filters.get("category"):
-        user_filters["category"] = filters["category"]
+    # ────────────────────────────────────────────────────
+    # New 3-layer architecture:
+    #   user_overrides  → hard SQL WHERE constraints
+    #   visual_baseline → soft scoring only (preserved attrs)
+    #   extraction_quality → scales preserved weight
+    # ────────────────────────────────────────────────────
+    user_overrides = body.get("user_overrides", {})
+    visual_baseline = body.get("visual_baseline", {})
+    extraction_quality = body.get("extraction_quality", 1.0)
+
+    # ── Backward compat: old callers send user_filters + detected_attributes ──
+    if not user_overrides and not visual_baseline:
+        # Legacy format
+        user_overrides = body.get("user_filters", {})
+        visual_baseline = body.get("detected_attributes", {})
+        filters = body.get("filters", {})
+
+        if not user_overrides:
+            hc = body.get("hard_constraints", {})
+            sp = body.get("soft_preferences", {})
+            if hc or sp:
+                for key, val in {**hc, **sp}.items():
+                    if isinstance(val, dict):
+                        user_overrides[key] = val.get("value", "")
+                    elif val:
+                        user_overrides[key] = val
+            elif filters:
+                user_overrides = {k: v for k, v in filters.items() if v}
+
+        target_category = body.get("target_category")
+        if target_category:
+            user_overrides["category"] = target_category
+        elif not user_overrides.get("category") and filters.get("category"):
+            user_overrides["category"] = filters["category"]
+
+    # Ensure baseline has category
+    if not visual_baseline.get("category") and detected_category:
+        visual_baseline["category"] = detected_category
+
+    # Category: user override > baseline > detected_category
+    effective_category = (
+        user_overrides.get("category")
+        or visual_baseline.get("category")
+        or detected_category
+    )
 
     log_step("SEARCH REQUEST", {
         "has_embedding": embedding is not None and len(embedding) > 0 if embedding else False,
-        "detected_attrs": detected_attributes,
-        "user_filters": {k: v for k, v in user_filters.items() if v},
+        "user_overrides": {k: v for k, v in user_overrides.items() if v},
+        "visual_baseline": {k: v for k, v in visual_baseline.items() if v},
+        "extraction_quality": extraction_quality,
+        "scene": scene_label,
+        "price_max": price_max,
         "top_k": top_k
     })
 
     if not embedding or len(embedding) == 0:
         return jsonify({"error": "No embedding provided"}), 400
 
-    # Build query_context for new retrieval v2
-    effective_category = user_filters.get("category") or detected_category
-    
+    # Build query_context for search_products_v2
+    # user_overrides → user_filters (hard SQL)
+    # visual_baseline → detected_attributes (scoring only)
     query_context = {
         "category": effective_category,
         "embedding": embedding,
-        "detected_attributes": detected_attributes,
-        "user_filters": user_filters,
+        "detected_attributes": visual_baseline,     # baseline = scoring only
+        "user_filters": user_overrides,              # overrides = hard SQL WHERE
+        "extraction_quality": extraction_quality,
         "price_max": price_max,
+        "scene": scene_label,                        # scene context for retrieval
     }
 
     t0 = _time.time()
@@ -436,6 +522,42 @@ def search_api():
 
     log_step("SEARCH RESULTS", f"Found {len(products)} products in {search_ms:.1f}ms")
 
+    # ── Explanation generation (top 5 only, pure function, no mutation) ──
+    try:
+        products = generate_explanations(
+            products,
+            detected_attrs=visual_baseline,
+            user_filters=user_overrides,
+            max_products=5
+        )
+    except Exception as e:
+        print(f"[Explain] Explanation generation failed (non-critical): {e}")
+
+    # ── Analytics: log search event + search_impression ──
+    log_event("search",
+        session_id=body.get("session_id"),
+        detected_category=effective_category,
+        user_filters=user_overrides,
+        override_category=user_overrides.get("category"),
+        pool_size=metadata.get("pool_size", 0),
+        result_count=len(products),
+        relaxation_steps=metadata.get("relaxation_log", []),
+        price_max=price_max,
+        scene_label=scene_label,
+        latency_ms=round(search_ms, 1),
+        user_agent=request.headers.get("User-Agent"),
+        device_type=parse_device_type(request.headers.get("User-Agent", "")),
+    )
+    # Impression logging (which products shown + their ranks)
+    if products:
+        log_event("search_impression",
+            session_id=body.get("session_id"),
+            detected_category=effective_category,
+            impression_ids=[p.get("product_id", "") for p in products[:20]],
+            impression_ranks=list(range(1, min(len(products), 20) + 1)),
+            result_count=len(products),
+        )
+
     return jsonify({
         "products": products,
         "metadata": {
@@ -445,6 +567,8 @@ def search_api():
             "weights": metadata.get("weights", {}),
             "overrides": metadata.get("overrides", {}),
             "pool_size": metadata.get("pool_size", 0),
+            "scene": scene_label,
+            "price_max": price_max,
         },
         "retrieval_meta": {
             "query_type": "text",
@@ -728,10 +852,49 @@ def metrics_route():
     })
 
 
+# ──────────────────────────────────────────────────
+# FRONTEND EVENT TRACKING ENDPOINT
+# ──────────────────────────────────────────────────
+@app.route('/track-event', methods=['POST'])
+def track_event():
+    """Accept frontend interaction events for analytics."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "no data"}), 400
+
+    event_type = data.get("event_type", "")
+    if event_type not in ("product_click", "buy_click", "explanation_view", "filter_change"):
+        return jsonify({"error": f"invalid event_type: {event_type}"}), 400
+
+    # Hash user_id for privacy if provided
+    user_id = None
+    if data.get("user_id"):
+        user_id = hash_user_id(data["user_id"])
+
+    log_event(event_type,
+        session_id=data.get("session_id"),
+        user_id=user_id,
+        clicked_product_id=data.get("product_id"),
+        rank_clicked=data.get("rank"),
+        product_url=data.get("product_url"),
+        explanation_shown=data.get("explanation_shown", False),
+        detected_category=data.get("category"),
+        visual_similarity=data.get("visual_similarity"),
+        final_score=data.get("final_score"),
+        user_agent=request.headers.get("User-Agent"),
+        device_type=parse_device_type(request.headers.get("User-Agent", "")),
+    )
+
+    return jsonify({"status": "ok"})
+
+
 if __name__ == "__main__":
+    import atexit
+    atexit.register(analytics_shutdown)  # flush remaining events on exit
+
     # Initialize services at startup
     print("[Startup] Initializing Filter Schema...")
     filter_schema.init()
-    print("SERVER READY -- product_retrieval.py + Filter Schema")
+    print("SERVER READY -- product_retrieval.py + Filter Schema + Analytics")
     # use_reloader=False prevents double model loading crash
     app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)

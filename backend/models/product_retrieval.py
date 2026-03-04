@@ -1,4 +1,4 @@
-﻿"""
+"""
 Product Retrieval Module - Hybrid (PostgreSQL + FAISS)
 Queries the products table for matching products based on filters.
 Supports vector similarity search if embedding is provided.
@@ -10,13 +10,8 @@ import json
 import gc
 import numpy as np
 
-# PostgreSQL Connection Config
-DB_CONFIG = {
-    "host": "localhost",
-    "database": "shopwhatyousee",
-    "user": "postgres",
-    "password": "postgres123@"
-}
+# Centralized DB config (Supabase in production, local fallback)
+from db_config import DB_CONFIG
 
 # FAISS paths - data is at project_root/data, not backend/data
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))  # backend/
@@ -905,6 +900,11 @@ def search_products_v2(query_context, top_k=10):
     print(f"[RetrievalV2] User filters: {user_filters}")
     print(f"[RetrievalV2] Has embedding: {query_embedding is not None}")
     
+    # Scene context (from Places365)
+    scene_label = query_context.get("scene")
+    if scene_label:
+        print(f"[RetrievalV2] 🎬 Scene: {scene_label}")
+    
     if not effective_category:
         print(f"[RetrievalV2] ❌ No category — returning empty")
         return {"products": [], "metadata": {"error": "no_category"}}
@@ -924,7 +924,18 @@ def search_products_v2(query_context, top_k=10):
     if "category" in overrides and overrides["category"]:
         effective_category = overrides["category"]
     
-    weights = MODE_WEIGHTS[mode]
+    weights = MODE_WEIGHTS[mode].copy()  # copy so we can scale
+
+    # ── Extraction quality scaling (Problem 3) ──
+    # If AGMAN extraction quality is low, reduce trust in preserved attrs
+    eq = query_context.get("extraction_quality", 1.0)
+    if eq is not None and eq < 0.7:
+        scale = max(0.2, eq)  # floor at 0.2 to avoid zeroing out
+        original_preserved = weights["preserved"]
+        weights["preserved"] = round(original_preserved * scale, 4)
+        weights["visual"] = round(weights["visual"] + (original_preserved - weights["preserved"]), 4)
+        print(f"[RetrievalV2] ⚠️ Low extraction_quality={eq:.2f}, "
+              f"preserved weight {original_preserved:.3f} → {weights['preserved']:.3f}")
     
     # Detected gender for SQL constraint (preserved if not overridden)
     detected_gender = preserved.get("gender") or detected_attrs.get("gender", "")
@@ -1113,12 +1124,19 @@ def search_products_v2(query_context, top_k=10):
     for i, prod in enumerate(candidates):
         v_score = float(visual_scores[i])
         
+        # ── Per-attribute match tracking (for explainability) ──
+        color_matched = False
+        pattern_matched = False
+        sleeve_matched = False
+        
         # Override score: how many overrides match this product?
         o_score = 0.0
+        override_match_details = {}
         if total_overrides > 0:
             matched = 0
             for field in override_fields:
                 override_val = overrides[field].lower().strip()
+                field_matched = False
                 
                 if field == "color":
                     # Check both primary_color_name and color_family
@@ -1126,21 +1144,28 @@ def search_products_v2(query_context, top_k=10):
                     prod_family = (prod.get("color_family") or "").lower()
                     _, override_family = _normalize_color_for_sql(overrides[field])
                     if override_val in prod_primary or override_val in prod_family:
-                        matched += 1
+                        field_matched = True
                     elif override_family and override_family in prod_family:
-                        matched += 1
+                        field_matched = True
+                    color_matched = field_matched
                 elif field == "sleeve":
                     if override_val == (prod.get("sleeve") or "").lower():
-                        matched += 1
+                        field_matched = True
+                    sleeve_matched = field_matched
                 elif field == "pattern":
                     if override_val == (prod.get("pattern") or "").lower():
-                        matched += 1
+                        field_matched = True
+                    pattern_matched = field_matched
                 elif field == "material":
                     if override_val == (prod.get("material") or "").lower():
-                        matched += 1
+                        field_matched = True
                 elif field == "style":
                     if override_val in (prod.get("style") or "").lower():
-                        matched += 1
+                        field_matched = True
+                
+                if field_matched:
+                    matched += 1
+                override_match_details[field] = field_matched
             
             o_score = matched / total_overrides
         
@@ -1150,18 +1175,28 @@ def search_products_v2(query_context, top_k=10):
             matched = 0
             for field in preserved_fields:
                 pres_val = preserved[field].lower().strip() if preserved[field] else ""
+                field_matched = False
                 
                 if field == "color":
                     prod_color = (prod.get("color") or "").lower()
                     prod_family = (prod.get("color_family") or "").lower()
                     if pres_val in prod_color or pres_val in prod_family:
-                        matched += 1
+                        field_matched = True
+                    if not color_matched:  # only set if override didn't already set it
+                        color_matched = field_matched
                 elif field == "sleeve":
                     if pres_val == (prod.get("sleeve") or "").lower():
-                        matched += 1
+                        field_matched = True
+                    if not sleeve_matched:
+                        sleeve_matched = field_matched
                 elif field == "pattern":
                     if pres_val == (prod.get("pattern") or "").lower():
-                        matched += 1
+                        field_matched = True
+                    if not pattern_matched:
+                        pattern_matched = field_matched
+                
+                if field_matched:
+                    matched += 1
             
             p_score = matched / total_preserved
         
@@ -1172,6 +1207,25 @@ def search_products_v2(query_context, top_k=10):
         prod["override_score"] = round(o_score, 4)
         prod["preserved_score"] = round(p_score, 4)
         prod["final_score"] = round(final_score, 4)
+        
+        # ── Explanation metadata (grounded, deterministic) ──
+        prod["match_meta"] = {
+            "visual_similarity": round(v_score, 4),
+            "color_match": color_matched,
+            "pattern_match": pattern_matched,
+            "sleeve_match": sleeve_matched,
+            "color_score": round(o_score if "color" in override_match_details else (p_score if "color" in preserved else 0.0), 4),
+            "pattern_score": round(o_score if "pattern" in override_match_details else (p_score if "pattern" in preserved else 0.0), 4),
+            "sleeve_score": round(o_score if "sleeve" in override_match_details else (p_score if "sleeve" in preserved else 0.0), 4),
+            "override_applied": len(override_fields) > 0,
+            "override_details": override_match_details,
+            "relaxed_constraints": [r.replace("Relaxed: ", "") for r in relaxation_log] if relaxation_log else [],
+            "visual_weight": round(w_visual, 3),
+            "override_weight": round(w_override, 3),
+            "preserved_weight": round(w_preserved, 3),
+            "final_score": round(final_score, 4),
+        }
+        
         scored_candidates.append(prod)
     
     # Sort by final_score descending, then product_id for determinism
@@ -1179,6 +1233,15 @@ def search_products_v2(query_context, top_k=10):
     
     # Take top K
     results = scored_candidates[:top_k]
+    
+    # ── Annotate rank position + percentile for explainability ──
+    pool_size = len(scored_candidates)
+    for rank_idx, prod in enumerate(results):
+        prod["match_meta"]["rank_position"] = rank_idx + 1
+        prod["match_meta"]["total_candidates"] = pool_size
+        prod["match_meta"]["visual_percentile"] = round(
+            100.0 * (1.0 - rank_idx / max(pool_size, 1)), 1
+        )
     
     # =========================================================
     # LOGGING

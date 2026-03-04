@@ -15,13 +15,10 @@ NOTE: filter_schema.init() runs ONCE at startup.
 import os
 import psycopg2
 
-# ---- DB Config (same as retrieval_service) ----
-DB_CONFIG = {
-    "host": os.getenv("DB_HOST", "localhost"),
-    "database": os.getenv("DB_NAME", "shopwhatyousee"),
-    "user": os.getenv("DB_USER", "postgres"),
-    "password": os.getenv("DB_PASS", "postgres123@"),
-}
+# Centralized DB config (Supabase in production, local fallback)
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from db_config import DB_CONFIG
 
 # ---- Category Groups (same as retrieval_validation.py) ----
 CATEGORY_GROUPS = {
@@ -108,6 +105,9 @@ class FilterSchema:
         print("[FilterSchema] READY")
 
     # ---- Prompt Block ----
+    # Values to exclude from LLM prompt (they exist in DB but shouldn't be user-facing)
+    _EXCLUDED_VALUES = {"not_applicable", "Not Applicable", "not applicable"}
+
     def prompt_block(self):
         """Render allowed values for LLM prompt injection."""
         if not self._initialized:
@@ -115,8 +115,9 @@ class FilterSchema:
 
         lines = ["ALLOWED FILTER VALUES (output EXACT strings only):"]
         for field, values in sorted(self.allowed.items()):
-            sorted_vals = sorted(values)
-            lines.append(f"  {field}: {', '.join(sorted_vals)}")
+            # Exclude not_applicable from the list shown to LLM
+            filtered = sorted(v for v in values if v.lower().replace(" ", "_") != "not_applicable")
+            lines.append(f"  {field}: {', '.join(filtered)}")
         return "\n".join(lines)
 
     # ---- Validation ----
@@ -150,6 +151,11 @@ class FilterSchema:
                 continue
             if not isinstance(value, str):
                 print(f"  [FilterSchema] WARN: {field}={value} is not string, dropping")
+                continue
+
+            # Guard: never allow "not_applicable" for sleeve or pattern
+            if field in ("sleeve_value", "pattern_value") and value.lower().replace(" ", "_") == "not_applicable":
+                print(f"  [FilterSchema] BLOCKED: {field}='{value}' — not_applicable is never valid for user queries")
                 continue
 
             # Case-sensitive match against DB values

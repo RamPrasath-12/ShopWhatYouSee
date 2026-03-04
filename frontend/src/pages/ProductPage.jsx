@@ -10,15 +10,31 @@ const ProductPage = () => {
 
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [currentFilters, setCurrentFilters] = useState(llmFilters || {});
 
-    // Store ORIGINAL AGMAN attributes separately (never overwritten by LLM)
-    const [originalAttributes, setOriginalAttributes] = useState(null);
+    // ────────────────────────────────────────────────────────
+    // 3-LAYER FILTER ARCHITECTURE
+    // ────────────────────────────────────────────────────────
+    // Layer 1: Visual Baseline (IMMUTABLE after init)
+    //   What the camera detected via AGMAN. Never mutated.
+    //   Sent to backend as soft scoring signals only.
+    const [visualBaseline, setVisualBaseline] = useState(null);
 
-    // Search generation counter — prevents stale results from overwriting newer ones
+    // Layer 2: User Overrides (only what user explicitly changed)
+    //   Each value tagged: { value: "red", source: "user" }
+    //   price_max is stored here too: { value: 500, source: "user" }
+    //   Sent to backend as hard SQL WHERE constraints.
+    const [userOverrides, setUserOverrides] = useState({});
+
+    // Layer 3: Extraction Quality (from AGMAN)
+    //   Influences preserved weight in scoring.
+    const [extractionQuality, setExtractionQuality] = useState(1.0);
+
+    // Search generation counter — prevents stale results
     const searchGenRef = useRef(0);
-    // Prevent double-firing of handleQuerySubmit (React concurrent rendering)
+    // Prevent double-firing of handleQuerySubmit
     const queryInFlightRef = useRef(false);
+    // Prevent double-firing of initial useEffect search
+    const initialSearchDoneRef = useRef(false);
 
     // Product detail modal state
     const [selectedProduct, setSelectedProduct] = useState(null);
@@ -31,69 +47,110 @@ const ProductPage = () => {
     const category = item ? item.class.toLowerCase() : "unknown";
     const attributes = item?.attributes;
 
-    // Initialize originalAttributes on first load
+    // Track which product explanations are expanded
+    const [expandedExpl, setExpandedExpl] = useState({});
+
+    // ── Analytics: fire tracking events to backend ──
+    const sessionId = React.useMemo(() => {
+        let sid = sessionStorage.getItem('swys_session');
+        if (!sid) { sid = crypto.randomUUID(); sessionStorage.setItem('swys_session', sid); }
+        return sid;
+    }, []);
+    const trackEvent = (eventType, extra = {}) => {
+        axios.post('http://localhost:5000/track-event', {
+            event_type: eventType,
+            session_id: sessionId,
+            category: category,
+            ...extra,
+        }).catch(() => { });  // fire-and-forget
+    };
+
+    // ── Canonical key mapper (Problem 5) ──
+    const CANONICAL_KEYS = {
+        color_family: "color", primary_color_name: "color",
+        sleeve_value: "sleeve", sleeve_length: "sleeve",
+        pattern_value: "pattern",
+        price_bucket: "price", price_max: "price",
+    };
+    const canonicalize = (key) => CANONICAL_KEYS[key] || key;
+
+    // ── Friendly display labels for filter chips ──
+    const DISPLAY_LABELS = {
+        color: "Color", sleeve: "Sleeve", pattern: "Pattern",
+        category: "Category", gender: "Gender", style: "Style",
+        material: "Material", price: "Price",
+    };
+    const chipLabel = (key) => DISPLAY_LABELS[key] || key;
+
+    // ── Flatten overrides: strip source metadata before sending ──
+    // Also extracts price_max separately (backend expects it at top level)
+    const flattenOverrides = (overrides) => {
+        const flat = {};
+        let priceMax = null;
+        for (const [k, meta] of Object.entries(overrides)) {
+            if (k === 'price') {
+                priceMax = meta.value; // price_max sent as top-level param
+            } else {
+                flat[k] = meta.value;
+            }
+        }
+        return { flat, priceMax };
+    };
+
+    // Initialize visual baseline ONCE on first load (immutable)
     useEffect(() => {
-        if (item && item.attributes && !originalAttributes) {
-            setOriginalAttributes({
+        if (item && item.attributes && !visualBaseline) {
+            const baseline = {
                 category: item.class,
-                color_hex: item.attributes.color_hex,
-                color_name: item.attributes.color_name,
-                pattern: item.attributes.pattern,
-                sleeve_length: item.attributes.sleeve
-            });
-            console.log("[ProductPage] Stored original AGMAN attributes:", item.attributes);
+                color_name: item.attributes.color_name || "",
+                color_hex: item.attributes.color_hex || "",
+                pattern: item.attributes.pattern || "",
+                sleeve: item.attributes.sleeve || "",
+                gender: llmFilters?.gender || "",
+            };
+            setVisualBaseline(baseline);
+            setExtractionQuality(item.attributes.extraction_quality || 1.0);
+            console.log("[ProductPage] 🔒 Visual baseline set (immutable):", baseline);
         }
     }, [item]);
 
-    const mockTitles = {
-        "shirt": "Men's Classic Regular Fit Cotton Formal Shirt",
-        "tshirt": "Premium Cotton Crew Neck T-Shirt - Urban Style",
-        "jacket": "Vintage Denim Trucker Jacket with Sherpa Lining",
-        "dress": "Women's Elegant A-Line Evening Dress",
-        "pants": "Slim Fit Chinos | Stretchable Fabric",
-        "cap": "Sports Baseball Cap - Adjustable Strap"
-    };
+    // Scene label for display
+    const sceneLabel = scene?.scene_label
+        ? scene.scene_label.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+        : null;
 
-    const mockPrice = {
-        "shirt": 499, "tshirt": 299, "jacket": 1299,
-        "dress": 899, "pants": 699, "cap": 199
-    };
-
-    // Initial Search (uses V2 with visual attributes as soft preferences)
+    // ── Initial Search: PURE_SIMILARITY with no user overrides ──
+    // Guard: only fire ONCE (React strict mode protection)
     useEffect(() => {
-        if (item) {
+        if (item && !initialSearchDoneRef.current) {
+            initialSearchDoneRef.current = true;
             setLoading(true);
-            // Default filters if none provided
-            const initialFilters = llmFilters || {
-                category: item.class,
-                color: attributes?.color_name || attributes?.color_hex,
-                pattern: attributes?.pattern
-            };
-            setCurrentFilters(initialFilters);
 
-            // Build detected_attributes from AG-MAN detection
-            const detectedAttrs = {
+            // Baseline attributes from AG-MAN detection
+            const baseline = {
                 category: item.class,
                 color_name: attributes?.color_name || "",
                 sleeve: attributes?.sleeve || "",
                 pattern: attributes?.pattern || "",
-                gender: llmFilters?.gender || ""
+                gender: llmFilters?.gender || "",
             };
 
-            // Increment search generation — stale results will be ignored
             const gen = ++searchGenRef.current;
-            console.log(`[ProductPage] Initial search gen=${gen} — PURE_SIMILARITY mode`, { detectedAttrs });
+            console.log(`[ProductPage] Initial search gen=${gen} — PURE_SIMILARITY (no overrides)`, { baseline });
 
+            // Send baseline and overrides SEPARATELY (Problem 1)
+            // user_overrides = { category only } → ensures SQL pools the right category
+            // visual_baseline = full baseline → scoring only
             axios.post('http://localhost:5000/search', {
                 detected_category: item.class,
                 embedding: embedding,
-                detected_attributes: detectedAttrs,
-                user_filters: { category: item.class },
+                visual_baseline: baseline,
+                user_overrides: { category: item.class },
+                extraction_quality: attributes?.extraction_quality || 1.0,
             })
                 .then(res => {
-                    // Only apply if this is still the latest search
                     if (searchGenRef.current !== gen) {
-                        console.log(`[ProductPage] ❌ Ignoring stale initial search gen=${gen} (current=${searchGenRef.current})`);
+                        console.log(`[ProductPage] ❌ Ignoring stale initial search gen=${gen}`);
                         return;
                     }
                     if (res.data.products && res.data.products.length > 0) {
@@ -115,36 +172,87 @@ const ProductPage = () => {
     const [userQuery, setUserQuery] = useState("");
     const [queryLoading, setQueryLoading] = useState(false);
 
+    // ── Helper: fire search with current state ──
+    const fireSearch = async (overrides, gen) => {
+        const { flat, priceMax } = flattenOverrides(overrides);
+        console.log(`[ProductPage] 🚀 Sending search gen=${gen}`, {
+            visual_baseline: visualBaseline,
+            user_overrides: flat,
+            price_max: priceMax,
+            scene: scene?.scene_label,
+        });
+
+        const searchRes = await axios.post('http://localhost:5000/search', {
+            detected_category: item.class,
+            embedding: embedding,
+            visual_baseline: visualBaseline,         // scoring only
+            user_overrides: flat,                    // hard SQL
+            extraction_quality: extractionQuality,
+            price_max: priceMax,                     // hard SQL price cap
+            scene: scene?.scene_label || null,       // scene context for retrieval
+        });
+
+        if (searchGenRef.current !== gen) {
+            console.log(`[ProductPage] ❌ Stale after search — gen=${gen}`);
+            return;
+        }
+
+        if (searchRes.data.products && searchRes.data.products.length > 0) {
+            setProducts(searchRes.data.products);
+            console.log(`[ProductPage] ✅ Applied ${searchRes.data.products.length} results gen=${gen}`, {
+                metadata: searchRes.data.metadata,
+            });
+        } else {
+            console.log(`[ProductPage] ⚠️ No products returned for gen=${gen}`);
+        }
+    };
+
+    // ── Handle filter chip removal (✕ click) ──
+    const handleRemoveOverride = async (key) => {
+        const updated = { ...userOverrides };
+        delete updated[key];
+        setUserOverrides(updated);
+
+        const gen = ++searchGenRef.current;
+        console.log(`[ProductPage] 🗑️ Removed override '${key}', re-searching gen=${gen}`);
+        setQueryLoading(true);
+        try {
+            await fireSearch(updated, gen);
+        } catch (err) {
+            console.error("Search after override removal failed:", err);
+        } finally {
+            setQueryLoading(false);
+        }
+    };
+
     const handleQuerySubmit = async (e) => {
         e.preventDefault();
         if (!userQuery.trim()) return;
 
         // ━━━ GUARD 1: Prevent double-firing ━━━
         if (queryInFlightRef.current) {
-            console.log("[ProductPage] ⚠️ Query already in flight — skipping duplicate");
+            console.log("[ProductPage] ⚠️ Query already in flight — skipping");
             return;
         }
         queryInFlightRef.current = true;
 
-        // ━━━ GUARD 2: IMMEDIATELY invalidate ALL pending/stale searches ━━━
-        // Increment BEFORE the LLM call so that any initial/stale search
-        // completing after this point will be discarded.
         const gen = ++searchGenRef.current;
         console.log(`[ProductPage] 🔄 Query submitted gen=${gen}: "${userQuery}"`);
 
         setQueryLoading(true);
         try {
+            // Build context for LLM — use baseline + current overrides
             const currentAttributesForLLM = {
                 category: item.class,
-                color_name: currentFilters.color || originalAttributes?.color_name || attributes?.color_name,
-                color_hex: currentFilters.color_hex || originalAttributes?.color_hex || attributes?.color_hex,
-                pattern: currentFilters.pattern || originalAttributes?.pattern || attributes?.pattern,
-                sleeve_length: currentFilters.sleeve || originalAttributes?.sleeve_length || attributes?.sleeve,
-                original_color: originalAttributes?.color_name,
-                original_pattern: originalAttributes?.pattern
+                color_name: visualBaseline?.color_name || attributes?.color_name,
+                color_hex: visualBaseline?.color_hex || attributes?.color_hex,
+                pattern: visualBaseline?.pattern || attributes?.pattern,
+                sleeve_length: visualBaseline?.sleeve || attributes?.sleeve,
+                original_color: visualBaseline?.color_name,
+                original_pattern: visualBaseline?.pattern,
             };
 
-            // 1. Call LLM for filter generation
+            // 1. Call LLM — returns add/remove/reset_to_visual
             const llmRes = await axios.post('http://localhost:5000/llm', {
                 user_query: userQuery,
                 item: currentAttributesForLLM,
@@ -152,71 +260,74 @@ const ProductPage = () => {
                 session_history: sessionHistory || [],
             });
 
-            const newFilters = llmRes.data.filters || {};
+            const llmAdd = llmRes.data.add || llmRes.data.filters || {};
+            const llmRemove = llmRes.data.remove || [];
+            const llmReset = llmRes.data.reset_to_visual || false;
             const llmConfidence = llmRes.data.confidence || 0;
             const priceMax = llmRes.data.price_max || null;
 
             console.log(`[ProductPage] LLM response gen=${gen}:`, {
-                filters: newFilters,
+                add: llmAdd, remove: llmRemove, reset: llmReset,
                 confidence: llmConfidence,
-                price_max: priceMax,
-                source: llmRes.data.source
             });
 
-            // ━━━ GUARD 3: Skip search if LLM returned FALLBACK / empty ━━━
-            if (!newFilters || Object.keys(newFilters).length === 0 || llmConfidence < 0.1) {
-                console.log(`[ProductPage] ⚠️ LLM FALLBACK (confidence=${llmConfidence}) — skipping search`);
+            // ━━━ GUARD: Skip if LLM fallback/empty and no reset/remove ━━━
+            if (!llmReset && llmRemove.length === 0 &&
+                (!llmAdd || Object.keys(llmAdd).length === 0) &&
+                llmConfidence < 0.1) {
+                console.log(`[ProductPage] ⚠️ LLM FALLBACK — skipping search`);
                 return;
             }
 
-            // Check if we're still the active query after LLM wait
+            // Staleness check after LLM wait
             if (searchGenRef.current !== gen) {
-                console.log(`[ProductPage] ❌ Stale after LLM — gen=${gen} vs current=${searchGenRef.current}`);
+                console.log(`[ProductPage] ❌ Stale after LLM`);
                 return;
             }
 
-            // 2. Merge LLM filters with current state (LLM keys override)
-            const mergedFilters = { ...currentFilters, ...newFilters };
-            setCurrentFilters(mergedFilters);
+            // 2. Apply add/remove/reset to userOverrides
+            let updatedOverrides;
 
-            // 3. Build detected_attributes from original AG-MAN
-            const detectedAttrs = {
-                category: originalAttributes?.category || item.class,
-                color_name: originalAttributes?.color_name || attributes?.color_name || "",
-                sleeve: originalAttributes?.sleeve_length || attributes?.sleeve || "",
-                pattern: originalAttributes?.pattern || attributes?.pattern || "",
-                gender: llmFilters?.gender || ""
-            };
-
-            console.log(`[ProductPage] 🚀 Sending search gen=${gen}`, {
-                detected_attributes: detectedAttrs,
-                user_filters: mergedFilters,
-            });
-
-            // 4. Fire search with correct LLM-merged filters
-            const searchRes = await axios.post('http://localhost:5000/search', {
-                detected_category: item.class,
-                embedding: embedding,
-                detected_attributes: detectedAttrs,
-                user_filters: mergedFilters,
-                price_max: priceMax,
-            });
-
-            // Check staleness after search completes
-            if (searchGenRef.current !== gen) {
-                console.log(`[ProductPage] ❌ Stale after search — gen=${gen} vs current=${searchGenRef.current}`);
-                return;
-            }
-
-            if (searchRes.data.products && searchRes.data.products.length > 0) {
-                setProducts(searchRes.data.products);
-                console.log(`[ProductPage] ✅ Applied ${searchRes.data.products.length} results gen=${gen}`, {
-                    metadata: searchRes.data.metadata,
-                    retrieval: searchRes.data.retrieval_meta
-                });
+            if (llmReset) {
+                // RESET: clear all user overrides → PURE_SIMILARITY
+                updatedOverrides = {};
+                console.log(`[ProductPage] 🔄 RESET to visual baseline`);
             } else {
-                console.log(`[ProductPage] ⚠️ No products returned for gen=${gen}`);
+                updatedOverrides = { ...userOverrides };
+
+                // Apply ADD (canonicalized, source-tagged)
+                if (llmAdd && typeof llmAdd === 'object') {
+                    for (const [rawKey, val] of Object.entries(llmAdd)) {
+                        if (!val || val === '') continue;
+                        const key = canonicalize(rawKey);
+                        updatedOverrides[key] = { value: val, source: "user" };
+                    }
+                }
+
+                // Apply REMOVE (canonicalized, with category guard)
+                if (Array.isArray(llmRemove)) {
+                    for (const rawKey of llmRemove) {
+                        const key = canonicalize(rawKey);
+                        // GUARD (Problem 2): category can only be removed if user overrode it
+                        if (key === "category" && !userOverrides.category) {
+                            console.log(`[ProductPage] ⛔ Blocked: cannot remove baseline category`);
+                            continue;
+                        }
+                        delete updatedOverrides[key];
+                    }
+                }
             }
+
+            // Store price_max as a user override (so it shows in chips and persists)
+            if (priceMax !== null && priceMax !== undefined && !llmReset) {
+                updatedOverrides.price = { value: priceMax, source: "user" };
+            }
+
+            setUserOverrides(updatedOverrides);
+
+            // 3. Fire search with updated overrides
+            await fireSearch(updatedOverrides, gen);
+
             setUserQuery("");
         } catch (err) {
             console.error("Query failed:", err);
@@ -242,8 +353,10 @@ const ProductPage = () => {
     if (!item) return <div style={{ color: 'white', padding: 20 }}>No product selected.</div>;
 
     const mainProduct = products.length > 0 ? products[0] : null;
-    const title = mainProduct ? mainProduct.name : (mockTitles[category] || `Premium ${item.class}`);
-    const price = mainProduct ? mainProduct.price : (mockPrice[category] || 499);
+    const title = mainProduct
+        ? mainProduct.name
+        : `Searching for ${category.charAt(0).toUpperCase() + category.slice(1)}...`;
+    const price = mainProduct ? mainProduct.price : null;
 
     return (
         <div style={styles.container}>
@@ -268,6 +381,32 @@ const ProductPage = () => {
                 {/* Insights Button */}
                 <button onClick={fetchInsights} style={styles.insightsBtn}>📊 Insights</button>
             </header>
+
+            {/* ── Active Filter Chips (show ONLY user overrides) ── */}
+            {Object.keys(userOverrides).length > 0 && (
+                <div style={styles.filterChipsBar}>
+                    <span style={{ fontSize: 12, color: '#666', marginRight: 8 }}>Active Filters:</span>
+                    {Object.entries(userOverrides).map(([key, meta]) => (
+                        <span key={key} style={styles.filterChip}>
+                            {chipLabel(key)}: {key === 'price' ? `Under ₹${meta.value}` : meta.value}
+                            <span
+                                style={styles.filterChipX}
+                                onClick={() => handleRemoveOverride(key)}
+                                title={`Remove ${chipLabel(key)} filter`}
+                            >✕</span>
+                        </span>
+                    ))}
+                    <span
+                        style={{ ...styles.filterChip, background: '#fff3cd', cursor: 'pointer' }}
+                        onClick={() => {
+                            setUserOverrides({});
+                            const gen = ++searchGenRef.current;
+                            setQueryLoading(true);
+                            fireSearch({}, gen).finally(() => setQueryLoading(false));
+                        }}
+                    >🔄 Reset All</span>
+                </div>
+            )}
 
             {/* Layout: No Body Scroll, Internal Scroll */}
             <div style={styles.contentArea}>
@@ -311,7 +450,7 @@ const ProductPage = () => {
                         {[1, 2, 3, 4, 5].map(star => (
                             <span key={star} style={{ cursor: 'pointer', fontSize: '20px', color: '#ffa41c', marginRight: 2 }}
                                 onClick={() => axios.post('http://localhost:5000/rating', {
-                                    rating: star, product_id: mainProduct?.product_id, query: userQuery, filters: currentFilters
+                                    rating: star, product_id: mainProduct?.product_id, query: userQuery, filters: flattenOverrides(userOverrides).flat
                                 }).then(() => alert(`Rated ${star} ⭐`))}
                             >⭐</span>
                         ))}
@@ -319,14 +458,20 @@ const ProductPage = () => {
                     </div>
 
                     <div style={styles.priceRow}>
-                        <sup style={{ fontSize: '14px', top: '-0.5em' }}>₹</sup>
-                        <span style={{ fontSize: '28px', fontWeight: '500' }}>{price}</span>
+                        {price != null && <><sup style={{ fontSize: '14px', top: '-0.5em' }}>₹</sup>
+                            <span style={{ fontSize: '28px', fontWeight: '500' }}>{price}</span></>}
                     </div>
 
                     <div style={styles.desc}>
                         <p>• <b>Visual Match:</b> AI matched this item based on color, pattern, and style from your selection.</p>
                         <p>• <b>Category:</b> {category.charAt(0).toUpperCase() + category.slice(1)}</p>
                         {attributes?.color_name && <p>• <b>Detected Color:</b> {attributes.color_name}</p>}
+                        {sceneLabel && <p>• <b>Scene:</b> {sceneLabel}</p>}
+                        {mainProduct?.explanation && (
+                            <p style={{ marginTop: 8, color: '#007185', fontStyle: 'italic', fontSize: 13 }}>
+                                💡 {mainProduct.explanation}
+                            </p>
+                        )}
                     </div>
 
                     {/* Similar Items */}
@@ -338,7 +483,15 @@ const ProductPage = () => {
                                     <div
                                         key={prod.id}
                                         style={styles.similarCard}
-                                        onClick={() => setSelectedProduct(prod)}
+                                        onClick={() => {
+                                            setSelectedProduct(prod);
+                                            trackEvent('product_click', {
+                                                product_id: prod.product_id,
+                                                rank: products.indexOf(prod),
+                                                visual_similarity: prod.match_meta?.visual_similarity,
+                                                final_score: prod.final_score,
+                                            });
+                                        }}
                                     >
                                         <div style={styles.similarImgWrapper}>
                                             <img
@@ -349,6 +502,31 @@ const ProductPage = () => {
                                         </div>
                                         <div style={styles.similarName}>{prod.name}</div>
                                         <div style={{ fontWeight: '700', color: '#B12704', fontSize: 13 }}>₹{prod.price}</div>
+                                        {prod.explanation && (
+                                            <>
+                                                <span
+                                                    style={styles.whyBtn}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setExpandedExpl(prev => ({
+                                                            ...prev,
+                                                            [prod.product_id]: !prev[prod.product_id]
+                                                        }));
+                                                        if (!expandedExpl[prod.product_id]) {
+                                                            trackEvent('explanation_view', {
+                                                                product_id: prod.product_id,
+                                                                explanation_shown: true,
+                                                            });
+                                                        }
+                                                    }}
+                                                >
+                                                    💡 {expandedExpl[prod.product_id] ? 'Hide' : 'Why?'}
+                                                </span>
+                                                {expandedExpl[prod.product_id] && (
+                                                    <div style={styles.explText}>{prod.explanation}</div>
+                                                )}
+                                            </>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -396,11 +574,16 @@ const ProductPage = () => {
                                 <button
                                     onClick={() => {
                                         const url = selectedProduct.product_url || `https://www.myntra.com/${selectedProduct.product_id}`;
+                                        trackEvent('buy_click', {
+                                            product_id: selectedProduct.product_id,
+                                            product_url: url,
+                                            final_score: selectedProduct.final_score,
+                                        });
                                         window.open(url, '_blank');
                                     }}
                                     style={{ marginTop: 20, padding: '10px 20px', background: '#FF3F6C', border: 'none', borderRadius: 20, cursor: 'pointer', fontWeight: 'bold', width: '100%', color: 'white', fontSize: 15 }}
                                 >
-                                    Buy Now on Myntra
+                                    Buy Now
                                 </button>
                             </div>
                         </div>
@@ -459,6 +642,11 @@ const styles = {
     queryInput: { flex: 1, padding: '10px 15px', borderRadius: '4px 0 0 4px', border: 'none', outline: 'none', fontSize: 15 },
     queryBtn: { padding: '0 25px', borderRadius: '0 4px 4px 0', border: 'none', background: '#febd69', cursor: 'pointer', fontWeight: 'bold', color: '#111' },
     insightsBtn: { padding: '8px 15px', borderRadius: 4, background: '#232f3e', color: 'white', cursor: 'pointer', border: '1px solid #555', fontSize: 13 },
+
+    // Filter Chips Bar
+    filterChipsBar: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: '8px 20px', background: '#f0f2f5', borderBottom: '1px solid #e7e7e7' },
+    filterChip: { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', background: '#e3f2fd', borderRadius: 16, fontSize: 12, fontWeight: 500, color: '#1565c0', border: '1px solid #bbdefb' },
+    filterChipX: { cursor: 'pointer', fontSize: 14, color: '#c62828', marginLeft: 4, fontWeight: 'bold', lineHeight: 1 },
 
     contentArea: { flex: 1, display: 'flex', overflow: 'hidden', maxWidth: '1400px', margin: '0 auto', width: '100%' },
 
@@ -549,7 +737,20 @@ const styles = {
     modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
     modalContent: { background: 'white', padding: 30, borderRadius: 8, width: 600, maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' },
     scoreRow: { display: 'flex', gap: 20, marginBottom: 20 },
-    scoreCard: { flex: 1, border: '1px solid #eee', padding: 15, borderRadius: 6, textAlign: 'center', background: '#FAFAFA' }
+    scoreCard: { flex: 1, border: '1px solid #eee', padding: 15, borderRadius: 6, textAlign: 'center', background: '#FAFAFA' },
+
+    // Explanation UI
+    whyBtn: {
+        display: 'inline-block', marginTop: 4, fontSize: 11, color: '#007185',
+        cursor: 'pointer', fontWeight: 600, userSelect: 'none',
+        padding: '2px 6px', borderRadius: 4, background: '#f0f9ff',
+        transition: 'background 0.2s',
+    },
+    explText: {
+        marginTop: 4, fontSize: 11, lineHeight: 1.5, color: '#555',
+        fontStyle: 'italic', padding: '4px 6px', background: '#fafafa',
+        borderRadius: 4, borderLeft: '2px solid #007185',
+    },
 };
 
 export default ProductPage;

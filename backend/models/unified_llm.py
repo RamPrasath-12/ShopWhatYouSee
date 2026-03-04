@@ -127,8 +127,23 @@ class UnifiedLLM:
             except ValueError:
                 pass
 
+        # Check for reset intent
+        reset_keywords = ["show original", "reset", "go back", "revert"]
+        reset_to_visual = any(kw in q for kw in reset_keywords)
+
+        # Check for removal intent
+        remove_keys = []
+        if "remove color" in q or "any color" in q:
+            remove_keys.extend(["color_family", "primary_color_name"])
+        if "remove sleeve" in q or "any sleeve" in q:
+            remove_keys.append("sleeve_value")
+        if "remove pattern" in q or "any pattern" in q:
+            remove_keys.append("pattern_value")
+
         return {
-            "filters": filters,
+            "add": filters if not reset_to_visual else {},
+            "remove": remove_keys,
+            "reset_to_visual": reset_to_visual,
             "price_max": price_max,
             "reasoning": "Keyword extraction fallback (LLM unavailable)",
             "confidence": 0.3,

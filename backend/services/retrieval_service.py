@@ -26,13 +26,10 @@ except ImportError:
     _HAS_PSUTIL = False
 
 
-# ─── DB Config ──────────────────────────────────────────────────────
-DB_CONFIG = {
-    "host": os.getenv("DB_HOST", "localhost"),
-    "database": os.getenv("DB_NAME", "shopwhatyousee"),
-    "user": os.getenv("DB_USER", "postgres"),
-    "password": os.getenv("DB_PASS", "postgres123@"),
-}
+# ─── DB Config (centralized — Supabase in production) ───────────────
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from db_config import DB_CONFIG
 
 # ─── Filter relaxation order (never drop category) ─────────────────
 RELAXATION_ORDER = ["material", "style", "price_bucket", "primary_color_name", "color_family", "gender"]

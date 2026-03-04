@@ -9,13 +9,8 @@ from datetime import datetime
 from typing import Dict, List, Any
 import os
 
-# PostgreSQL Connection Config (Matched with product_retrieval)
-DB_CONFIG = {
-    "host": "localhost",
-    "database": "shopwhatyousee",
-    "user": "postgres",
-    "password": "postgres123@"
-}
+# Centralized DB config (Supabase in production, local fallback)
+from db_config import DB_CONFIG
 
 def get_db():
     conn = psycopg2.connect(**DB_CONFIG)

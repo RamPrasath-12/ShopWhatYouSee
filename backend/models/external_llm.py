@@ -145,10 +145,26 @@ class GroqLLM:
             logger.error(f"Groq API error ({model}): {e}")
             return None
 
+    # Canonical key mapping — LLM may use DB names or display names
+    CANONICAL_KEYS = {
+        "color_family": "color", "primary_color_name": "color",
+        "sleeve_value": "sleeve", "sleeve_length": "sleeve",
+        "pattern_value": "pattern",
+    }
+
+    def _canonicalize_key(self, key):
+        """Map LLM/DB filter key names to canonical internal names."""
+        return self.CANONICAL_KEYS.get(key, key)
+
     def _parse_response(self, content: str) -> Dict[str, Any]:
         """
-        Parse Groq JSON response into flat filters.
-        Pipeline: parse -> extract -> return (validation done externally)
+        Parse Groq JSON response into add/remove/reset_to_visual structure.
+        
+        Handles both new schema ({add, remove, reset_to_visual}) and
+        legacy flat schema ({category, color_family, ...}) for backward compat.
+        
+        Pipeline: parse -> detect schema -> canonicalize -> return
+        (validation done externally in app.py)
         """
         try:
             # Clean markdown fences if any (shouldn't happen with json_object mode)
@@ -164,25 +180,51 @@ class GroqLLM:
 
             data = json.loads(json_match.group())
 
-            # ---- Extract flat filters ----
-            filters = {}
-            for field in ("category", "gender", "style", "material",
-                          "color_family", "price_bucket",
-                          "sleeve_value", "pattern_value", "primary_color_name"):
-                val = data.get(field)
-                if val is not None and val != "" and isinstance(val, str):
-                    filters[field] = val
+            # ---- Detect schema: new (add/remove) vs legacy (flat) ----
+            if "add" in data or "remove" in data or "reset_to_visual" in data:
+                # NEW SCHEMA: add/remove/reset_to_visual
+                raw_add = data.get("add", {}) or {}
+                raw_remove = data.get("remove", []) or []
+                reset_to_visual = bool(data.get("reset_to_visual", False))
 
-            # Extract price_max (numeric) for deterministic bucket mapping
-            price_max = data.get("price_max")
+                # Clean null/empty values from add
+                add_filters = {}
+                for field, val in raw_add.items():
+                    if val is not None and val != "" and isinstance(val, str):
+                        add_filters[field] = val
 
-            return {
-                "filters": filters,
-                "price_max": price_max,  # Numeric, will be mapped to bucket
-                "reasoning": data.get("reasoning", ""),
-                "confidence": data.get("confidence", 0.8),
-                "source": "groq"
-            }
+                # Ensure remove is a list of strings
+                remove_keys = [k for k in raw_remove if isinstance(k, str)]
+
+                return {
+                    "add": add_filters,
+                    "remove": remove_keys,
+                    "reset_to_visual": reset_to_visual,
+                    "price_max": data.get("price_max"),
+                    "reasoning": data.get("reasoning", ""),
+                    "confidence": data.get("confidence", 0.8),
+                    "source": "groq"
+                }
+            else:
+                # LEGACY SCHEMA: flat {category, color_family, ...}
+                # Convert to new format: treat all fields as "add"
+                add_filters = {}
+                for field in ("category", "gender", "style", "material",
+                              "color_family", "price_bucket",
+                              "sleeve_value", "pattern_value", "primary_color_name"):
+                    val = data.get(field)
+                    if val is not None and val != "" and isinstance(val, str):
+                        add_filters[field] = val
+
+                return {
+                    "add": add_filters,
+                    "remove": [],
+                    "reset_to_visual": False,
+                    "price_max": data.get("price_max"),
+                    "reasoning": data.get("reasoning", ""),
+                    "confidence": data.get("confidence", 0.8),
+                    "source": "groq"
+                }
 
         except json.JSONDecodeError as e:
             logger.warning(f"JSON parse error: {e}")
@@ -191,7 +233,9 @@ class GroqLLM:
     def _fallback_response(self, query: str) -> Dict[str, Any]:
         """Empty filters when all LLM attempts fail."""
         return {
-            "filters": {},
+            "add": {},
+            "remove": [],
+            "reset_to_visual": False,
             "price_max": None,
             "reasoning": "LLM unavailable, returning empty filters",
             "confidence": 0.0,

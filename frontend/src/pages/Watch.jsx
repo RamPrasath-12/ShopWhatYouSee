@@ -207,13 +207,14 @@ const Watch = () => {
         };
     }, []);
 
-    // Auto-hide scene badge after 10 seconds
+    // Scene badge visibility (auto-hide badge display after 10s, but keep data)
+    const [sceneVisible, setSceneVisible] = useState(false);
     useEffect(() => {
         if (scene) {
+            setSceneVisible(true);
             const timer = setTimeout(() => {
-                setScene(null);
-            }, 10000); // 10 seconds
-
+                setSceneVisible(false); // hide badge but KEEP scene data
+            }, 10000);
             return () => clearTimeout(timer);
         }
     }, [scene]);
@@ -332,13 +333,15 @@ const Watch = () => {
             const croppedB64 = captureCroppedFrame({ x, y, w, h });
             if (croppedB64) {
                 try {
-                    // Trigger scene detection automatically in background
-                    handleSceneDetect();
-
                     const res = await axios.post("/detect", {
                         image: croppedB64
                     });
                     setDetections(res.data.detections || []);
+                    // Scene detected inline alongside YOLO
+                    if (res.data.scene) {
+                        setScene(res.data.scene);
+                        console.log("[Scene] Detected (inline):", res.data.scene.scene_label);
+                    }
                 } catch (err) {
                     console.error("Lens Detection Error:", err);
                 }
@@ -355,13 +358,15 @@ const Watch = () => {
         const frameB64 = fullCanvas.toDataURL("image/jpeg", 0.9);
 
         try {
-            // Trigger scene detection automatically
-            handleSceneDetect();
-
             const res = await axios.post("/detect", {
                 image: frameB64
             });
             setDetections(res.data.detections || []);
+            // Scene detected inline alongside YOLO
+            if (res.data.scene) {
+                setScene(res.data.scene);
+                console.log("[Scene] Detected (inline):", res.data.scene.scene_label);
+            }
         } catch (err) {
             console.error("Detection Error:", err);
         }
@@ -375,11 +380,20 @@ const Watch = () => {
     };
 
     // Scene Detection
-    // Scene Detection - DISABLED as per user request
     const handleSceneDetect = async () => {
-        // Disabled logic to prevent scene appearing
-        console.log("Scene detection skipped as per configuration");
-        return;
+        try {
+            const fullCanvas = captureFrame();
+            if (!fullCanvas) return;
+            const frameB64 = fullCanvas.toDataURL("image/jpeg", 0.9);
+            console.log("[Scene] Detecting scene...");
+            const res = await axios.post("/scene", { image: frameB64 });
+            if (res.data && res.data.scene_label) {
+                setScene(res.data);
+                console.log("[Scene] Detected:", res.data.scene_label, "confidence:", res.data.confidence);
+            }
+        } catch (err) {
+            console.error("[Scene] Detection failed:", err);
+        }
     };
 
     // AG-MAN Attribute Extraction
