@@ -560,7 +560,7 @@ const ProductPage = () => {
                                     {selectedProduct.color && <div style={{ marginBottom: 5 }}><b>Color:</b> {selectedProduct.color}</div>}
                                     {selectedProduct.pattern && <div style={{ marginBottom: 5 }}><b>Pattern:</b> {selectedProduct.pattern}</div>}
                                     {selectedProduct.category && <div style={{ marginBottom: 5 }}><b>Category:</b> {selectedProduct.category}</div>}
-                                    {selectedProduct.product_id && <div style={{ color: '#888', marginTop: 15, fontSize: 12 }}>ID: {selectedProduct.product_id}</div>}
+                                    {selectedProduct.category && <div style={{ marginBottom: 5 }}><b>Category:</b> {selectedProduct.category}</div>}
                                 </div>
 
                                 {selectedProduct.final_score && (
@@ -573,7 +573,8 @@ const ProductPage = () => {
 
                                 <button
                                     onClick={() => {
-                                        const url = selectedProduct.product_url || `https://www.myntra.com/${selectedProduct.product_id}`;
+                                        const fallbackParam = selectedProduct.name ? encodeURIComponent(selectedProduct.name) : selectedProduct.product_id;
+                                        const url = selectedProduct.product_url || `https://www.myntra.com/${fallbackParam}`;
                                         trackEvent('buy_click', {
                                             product_id: selectedProduct.product_id,
                                             product_url: url,
