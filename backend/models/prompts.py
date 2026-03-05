@@ -28,7 +28,7 @@ CATEGORY OVERRIDE (VERY IMPORTANT):
   - Detected: "tshirt", User says "i want shirt" → add: {{"category": "shirts"}}
   - Detected: "tshirt", User says "i want jacket" → add: {{"category": "Jacket"}}
   - Detected: "shirts", User says "show me tshirt" → add: {{"category": "tshirt"}}
-  - Detected: "tshirt", User says "price less than 500" → add: {{"category": "tshirt"}}
+  - Detected: "tshirt", User says "price less than 500" → add: {{"category": "tshirt"}}, "price_max": 500
 - "shirt" and "formal shirt" map to "shirts" in allowed values
 - "tshirt" and "t-shirt" map to "tshirt" in allowed values
 - These are DIFFERENT categories. Do NOT confuse them.

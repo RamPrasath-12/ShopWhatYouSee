@@ -340,6 +340,14 @@ def llm_route():
         confidence = llm_result.get("confidence", 0.0)
         source = llm_result.get("source", "unknown")
 
+        # ── SAFETY NET: regex price extraction if LLM missed it ──
+        if price_max is None and user_query:
+            import re
+            price_match = re.search(r'(?:under|below|less than|cheaper than|<\s*)\s*(\d+)', user_query, re.IGNORECASE)
+            if price_match:
+                price_max = int(price_match.group(1))
+                print(f"  [Price] ⚠️ LLM missed price_max, regex extracted: {price_max}")
+
         log_step(f"LLM RAW ({source.upper()})", {
             "add": raw_add,
             "remove": remove_keys,

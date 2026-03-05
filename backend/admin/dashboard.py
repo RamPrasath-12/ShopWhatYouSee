@@ -87,6 +87,15 @@ def main():
         d1 = d2 = date.today()
 
     # ═══════════════════════════════════════════════
+    # AUTO-AGGREGATE TODAY'S DATA (INCREMENTAL)
+    # ═══════════════════════════════════════════════
+    try:
+        from tools.analytics_aggregation import aggregate_day
+        aggregate_day(date.today())
+    except Exception as e:
+        print(f"⚠️ Auto-aggregation error: {e}")
+
+    # ═══════════════════════════════════════════════
     # LOAD FROM analytics_daily_summary (fast!)
     # ═══════════════════════════════════════════════
     summary = q("""
@@ -441,6 +450,100 @@ def main():
         st.caption(f"Latest {len(raw)} events (max 100)")
     else:
         st.info("No events.")
+
+    st.divider()
+
+    # ═══════════════════════════════════════════════
+    # SECTION 8: LLM-POWERED SESSION INSIGHTS
+    # ═══════════════════════════════════════════════
+    st.header("🧠 LLM-Powered Session Insights")
+    st.caption("AI-generated analysis of user satisfaction and system performance based on rating data.")
+
+    # Fetch latest ratings
+    ratings_df = q("""
+        SELECT * FROM ratings
+        ORDER BY id DESC LIMIT 10
+    """)
+
+    if ratings_df.empty:
+        st.info("No ratings data found. Users need to submit ratings from the product page.")
+    else:
+        st.success(f"Found {len(ratings_df)} rating entries. Showing latest sessions below.")
+
+        # Summary stats from ratings
+        col_a, col_b, col_c = st.columns(3)
+        avg_r = ratings_df["rating"].mean() if "rating" in ratings_df.columns else 0
+        total_r = len(ratings_df)
+        high_r = len(ratings_df[ratings_df["rating"] >= 4]) if "rating" in ratings_df.columns else 0
+        col_a.metric("⭐ Avg Rating", f"{avg_r:.1f}")
+        col_b.metric("📊 Total Sessions", total_r)
+        col_c.metric("✅ High Satisfaction (≥4)", high_r)
+
+        # LLM Analysis toggle
+        if st.button("🤖 Generate LLM Key Findings", type="primary"):
+            with st.spinner("Generating LLM analysis..."):
+                try:
+                    from models.insights_engine import InsightsEngine
+
+                    engine = InsightsEngine(None)
+
+                    # Analyze latest rating
+                    latest = ratings_df.iloc[0].to_dict()
+                    analysis = engine.generate_report(latest)
+
+                    if analysis and not analysis.get("error"):
+                        st.subheader("🔍 Key Findings")
+
+                        # Relevance & Success badges
+                        rel_level = analysis.get("relevance_level", "N/A")
+                        success = analysis.get("successful_recommendation", False)
+                        badge_colors = {"High": "🟢", "Medium": "🟡", "Low": "🔴"}
+
+                        f1, f2 = st.columns(2)
+                        f1.metric("Relevance Level", f"{badge_colors.get(rel_level, '⚪')} {rel_level}")
+                        f2.metric("Successful Recommendation", "✅ Yes" if success else "❌ No")
+
+                        # Strengths
+                        strengths = analysis.get("strengths", [])
+                        if strengths:
+                            st.subheader("💪 Strengths")
+                            for s in strengths:
+                                st.markdown(f"- {s}")
+
+                        # Weaknesses
+                        weaknesses = analysis.get("weaknesses", [])
+                        if weaknesses:
+                            st.subheader("⚠️ Weaknesses & Risks")
+                            for w in weaknesses:
+                                st.markdown(f"- :red[{w}]")
+
+                        # Improvement suggestion
+                        suggestion = analysis.get("improvement_suggestion", "")
+                        if suggestion:
+                            st.subheader("💡 Technical Improvement")
+                            st.info(suggestion)
+
+                        # User behavior
+                        behavior = analysis.get("user_behavior_analysis", "")
+                        if behavior:
+                            st.subheader("👤 User Behavior Analysis")
+                            st.write(behavior)
+                    else:
+                        st.warning(f"LLM analysis returned an error: {analysis.get('error', 'Unknown')}")
+
+                except Exception as e:
+                    st.error(f"Failed to generate LLM insights: {e}")
+
+        # Individual rating entries
+        st.subheader("📝 Recent Rating Entries")
+        for idx, row in ratings_df.iterrows():
+            rating_val = row.get("rating", "N/A")
+            prod_id = row.get("product_id", "Unknown")
+            query_val = row.get("query", "")
+            emoji = "⭐" * int(rating_val) if isinstance(rating_val, (int, float)) else ""
+            with st.expander(f"Session #{row.get('id', idx)} — {emoji} ({rating_val}/5) — Product: {prod_id}"):
+                st.json(row.to_dict())
+
 
 
 if __name__ == "__main__":

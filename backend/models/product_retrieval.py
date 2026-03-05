@@ -613,9 +613,9 @@ def search_products(filters, top_k=50):
 # Dynamic scoring weights per mode
 MODE_WEIGHTS = {
     "PURE_SIMILARITY":    {"visual": 0.85, "override": 0.00, "preserved": 0.15},
-    "ATTRIBUTE_OVERRIDE": {"visual": 0.60, "override": 0.30, "preserved": 0.10},
-    "CATEGORY_TRANSFORM": {"visual": 0.75, "override": 0.20, "preserved": 0.05},
-    "COMBINED":           {"visual": 0.65, "override": 0.25, "preserved": 0.10},
+    "ATTRIBUTE_OVERRIDE": {"visual": 0.50, "override": 0.40, "preserved": 0.10},
+    "CATEGORY_TRANSFORM": {"visual": 0.60, "override": 0.20, "preserved": 0.20},
+    "COMBINED":           {"visual": 0.45, "override": 0.35, "preserved": 0.20},
 }
 
 # Override strictness defaults
@@ -929,7 +929,7 @@ def search_products_v2(query_context, top_k=10):
     # ── Extraction quality scaling (Problem 3) ──
     # If AGMAN extraction quality is low, reduce trust in preserved attrs
     eq = query_context.get("extraction_quality", 1.0)
-    if eq is not None and eq < 0.7:
+    if eq is not None and eq < 0.5:
         scale = max(0.2, eq)  # floor at 0.2 to avoid zeroing out
         original_preserved = weights["preserved"]
         weights["preserved"] = round(original_preserved * scale, 4)
@@ -1129,59 +1129,82 @@ def search_products_v2(query_context, top_k=10):
         pattern_matched = False
         sleeve_matched = False
         
-        # Override score: how many overrides match this product?
+        # Override score: how well does this product match user constraints?
+        # EXACT match = 1.0 per field, FAMILY/FUZZY match = 0.5
         o_score = 0.0
         override_match_details = {}
         if total_overrides > 0:
-            matched = 0
+            matched_score = 0.0
             for field in override_fields:
                 override_val = overrides[field].lower().strip()
-                field_matched = False
+                field_score = 0.0  # 0 = no match, 0.5 = family, 1.0 = exact
                 
                 if field == "color":
                     # Check both primary_color_name and color_family
-                    prod_primary = (prod.get("color") or "").lower()
-                    prod_family = (prod.get("color_family") or "").lower()
+                    prod_primary = (prod.get("color") or "").lower().strip()
+                    prod_family = (prod.get("color_family") or "").lower().strip()
                     _, override_family = _normalize_color_for_sql(overrides[field])
-                    if override_val in prod_primary or override_val in prod_family:
-                        field_matched = True
-                    elif override_family and override_family in prod_family:
-                        field_matched = True
-                    color_matched = field_matched
+                    
+                    # Exact match on primary color name
+                    if override_val == prod_primary:
+                        field_score = 1.0
+                    elif override_val in prod_primary:
+                        field_score = 0.9
+                    # Family match (e.g. "green" family includes olive, teal)
+                    elif override_family and (override_family == prod_family or override_family in prod_primary):
+                        field_score = 0.5
+                    elif override_val == prod_family or override_val in prod_family:
+                        field_score = 0.5
+                    
+                    color_matched = field_score > 0
                 elif field == "sleeve":
-                    if override_val == (prod.get("sleeve") or "").lower():
-                        field_matched = True
-                    sleeve_matched = field_matched
+                    prod_sleeve = (prod.get("sleeve") or "").lower().strip()
+                    if override_val == prod_sleeve:
+                        field_score = 1.0
+                    elif override_val in prod_sleeve or prod_sleeve in override_val:
+                        field_score = 0.5
+                    sleeve_matched = field_score > 0
                 elif field == "pattern":
-                    if override_val == (prod.get("pattern") or "").lower():
-                        field_matched = True
-                    pattern_matched = field_matched
+                    prod_pattern = (prod.get("pattern") or "").lower().strip()
+                    if override_val == prod_pattern:
+                        field_score = 1.0
+                    elif override_val in prod_pattern or prod_pattern in override_val:
+                        field_score = 0.5
+                    pattern_matched = field_score > 0
                 elif field == "material":
                     if override_val == (prod.get("material") or "").lower():
-                        field_matched = True
+                        field_score = 1.0
                 elif field == "style":
                     if override_val in (prod.get("style") or "").lower():
-                        field_matched = True
+                        field_score = 1.0
                 
-                if field_matched:
-                    matched += 1
-                override_match_details[field] = field_matched
+                matched_score += field_score
+                override_match_details[field] = field_score > 0
             
-            o_score = matched / total_overrides
+            o_score = matched_score / total_overrides
         
         # Preserved score: how many preserved attrs match this product?
+        # Color gets a 1.5x multiplier so it's the strongest preserved signal
         p_score = 0.0
         if total_preserved > 0:
-            matched = 0
+            weighted_matched = 0.0
+            weighted_total = 0.0
             for field in preserved_fields:
                 pres_val = preserved[field].lower().strip() if preserved[field] else ""
                 field_matched = False
+                field_weight = 1.5 if field == "color" else 1.0  # color priority boost
                 
                 if field == "color":
                     prod_color = (prod.get("color") or "").lower()
                     prod_family = (prod.get("color_family") or "").lower()
+                    # Check exact match
                     if pres_val in prod_color or pres_val in prod_family:
                         field_matched = True
+                    else:
+                        # Also check color family match (e.g. navy blue → blue)
+                        pres_family = COLOR_FAMILIES.get(pres_val, pres_val)
+                        if pres_family == prod_family or pres_family in prod_color:
+                            field_matched = True
                     if not color_matched:  # only set if override didn't already set it
                         color_matched = field_matched
                 elif field == "sleeve":
@@ -1195,10 +1218,11 @@ def search_products_v2(query_context, top_k=10):
                     if not pattern_matched:
                         pattern_matched = field_matched
                 
+                weighted_total += field_weight
                 if field_matched:
-                    matched += 1
+                    weighted_matched += field_weight
             
-            p_score = matched / total_preserved
+            p_score = weighted_matched / weighted_total if weighted_total > 0 else 0.0
         
         # Final weighted score
         final_score = (w_visual * v_score) + (w_override * o_score) + (w_preserved * p_score)

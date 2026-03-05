@@ -6,7 +6,7 @@ import axios from 'axios';
 const ProductPage = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const { item, movie, llmFilters, scene, embedding, sessionHistory } = location.state || {};
+    const { item, movie, llmFilters, llmPriceMax, scene, embedding, sessionHistory } = location.state || {};
 
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -39,9 +39,6 @@ const ProductPage = () => {
     // Product detail modal state
     const [selectedProduct, setSelectedProduct] = useState(null);
 
-    // Insights Modal State
-    const [showInsights, setShowInsights] = useState(false);
-    const [insightsData, setInsightsData] = useState(null);
 
     // Dynamic mock details based on detected class
     const category = item ? item.class.toLowerCase() : "unknown";
@@ -110,6 +107,30 @@ const ProductPage = () => {
             };
             setVisualBaseline(baseline);
             setExtractionQuality(item.attributes.extraction_quality || 1.0);
+
+            // ── Apply LLM filters from Watch.jsx as user overrides ──
+            // This ensures filters like color, sleeve, pattern requested on
+            // the Watch page are actually used in the initial search.
+            const initialOverrides = {};
+            if (llmFilters && typeof llmFilters === 'object') {
+                for (const [rawKey, val] of Object.entries(llmFilters)) {
+                    if (!val || val === '' || rawKey === 'category') continue; // category handled separately
+                    const cKey = canonicalize(rawKey);
+                    if (cKey === 'price') continue; // price handled via llmPriceMax
+                    // Use the most specific value (e.g. primary_color_name "Red" over color_family "red")
+                    if (!initialOverrides[cKey] || rawKey === 'primary_color_name' || rawKey === 'sleeve_value' || rawKey === 'pattern_value') {
+                        initialOverrides[cKey] = { value: val, source: 'user' };
+                    }
+                }
+            }
+            if (llmPriceMax) {
+                initialOverrides.price = { value: llmPriceMax, source: 'user' };
+            }
+            if (Object.keys(initialOverrides).length > 0) {
+                setUserOverrides(prev => ({ ...prev, ...initialOverrides }));
+                console.log("[ProductPage] 📋 Watch.jsx LLM filters applied as overrides:", initialOverrides);
+            }
+
             console.log("[ProductPage] 🔒 Visual baseline set (immutable):", baseline);
         }
     }, [item]);
@@ -119,7 +140,7 @@ const ProductPage = () => {
         ? scene.scene_label.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
         : null;
 
-    // ── Initial Search: PURE_SIMILARITY with no user overrides ──
+    // ── Initial Search: Uses LLM filters from Watch.jsx if present ──
     // Guard: only fire ONCE (React strict mode protection)
     useEffect(() => {
         if (item && !initialSearchDoneRef.current) {
@@ -130,23 +151,39 @@ const ProductPage = () => {
             const baseline = {
                 category: item.class,
                 color_name: attributes?.color_name || "",
+                color_hex: attributes?.color_hex || "",
                 sleeve: attributes?.sleeve || "",
                 pattern: attributes?.pattern || "",
                 gender: llmFilters?.gender || "",
             };
 
-            const gen = ++searchGenRef.current;
-            console.log(`[ProductPage] Initial search gen=${gen} — PURE_SIMILARITY (no overrides)`, { baseline });
+            // ── Build initial user_overrides from Watch.jsx LLM filters ──
+            const initOverrides = { category: item.class };
+            if (llmFilters && typeof llmFilters === 'object') {
+                for (const [rawKey, val] of Object.entries(llmFilters)) {
+                    if (!val || val === '' || rawKey === 'category') continue;
+                    const cKey = canonicalize(rawKey);
+                    if (cKey === 'price') continue;
+                    // For duplicates (color_family + primary_color_name both → "color"),
+                    // prefer the more specific key
+                    if (!initOverrides[cKey] || rawKey === 'primary_color_name' || rawKey === 'sleeve_value' || rawKey === 'pattern_value') {
+                        initOverrides[cKey] = val;
+                    }
+                }
+            }
 
-            // Send baseline and overrides SEPARATELY (Problem 1)
-            // user_overrides = { category only } → ensures SQL pools the right category
-            // visual_baseline = full baseline → scoring only
+            const gen = ++searchGenRef.current;
+            const hasLlmOverrides = Object.keys(initOverrides).length > 1;
+            console.log(`[ProductPage] Initial search gen=${gen}${hasLlmOverrides ? ' — WITH Watch.jsx LLM overrides' : ' — PURE_SIMILARITY'}`, { baseline, initOverrides });
+
             axios.post('http://localhost:5000/search', {
                 detected_category: item.class,
                 embedding: embedding,
                 visual_baseline: baseline,
-                user_overrides: { category: item.class },
+                user_overrides: initOverrides,
                 extraction_quality: attributes?.extraction_quality || 1.0,
+                price_max: llmPriceMax || null,
+                scene: scene?.scene_label || null,
             })
                 .then(res => {
                     if (searchGenRef.current !== gen) {
@@ -338,17 +375,6 @@ const ProductPage = () => {
         }
     };
 
-    // Load Insights Logic
-    const fetchInsights = async () => {
-        try {
-            const res = await axios.get('http://localhost:5000/insights');
-            setInsightsData(res.data);
-            setShowInsights(true);
-        } catch (err) {
-            console.error(err);
-            alert("Failed to load insights");
-        }
-    };
 
     if (!item) return <div style={{ color: 'white', padding: 20 }}>No product selected.</div>;
 
@@ -378,8 +404,6 @@ const ProductPage = () => {
                     </button>
                 </form>
 
-                {/* Insights Button */}
-                <button onClick={fetchInsights} style={styles.insightsBtn}>📊 Insights</button>
             </header>
 
             {/* ── Active Filter Chips (show ONLY user overrides) ── */}
@@ -560,7 +584,6 @@ const ProductPage = () => {
                                     {selectedProduct.color && <div style={{ marginBottom: 5 }}><b>Color:</b> {selectedProduct.color}</div>}
                                     {selectedProduct.pattern && <div style={{ marginBottom: 5 }}><b>Pattern:</b> {selectedProduct.pattern}</div>}
                                     {selectedProduct.category && <div style={{ marginBottom: 5 }}><b>Category:</b> {selectedProduct.category}</div>}
-                                    {selectedProduct.category && <div style={{ marginBottom: 5 }}><b>Category:</b> {selectedProduct.category}</div>}
                                 </div>
 
                                 {selectedProduct.final_score && (
@@ -592,45 +615,6 @@ const ProductPage = () => {
                 </div>
             )}
 
-            {/* INSIGHTS MODAL OVERLAY */}
-            {showInsights && (
-                <div style={styles.modalOverlay} onClick={() => setShowInsights(false)}>
-                    <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee', paddingBottom: 10 }}>
-                            <h2 style={{ margin: 0 }}>System Evaluation</h2>
-                            <button onClick={() => setShowInsights(false)} style={{ border: 'none', background: 'none', fontSize: 20, cursor: 'pointer' }}>✖</button>
-                        </div>
-                        {insightsData && (
-                            <div style={{ marginTop: 20 }}>
-                                <div style={styles.scoreRow}>
-                                    <div style={styles.scoreCard}>
-                                        <span style={{ fontSize: 12, color: '#666' }}>Avg Satisfaction</span>
-                                        <div style={{ fontSize: 24, fontWeight: 'bold', color: '#007185' }}>{insightsData.stats.average_rating} ⭐</div>
-                                    </div>
-                                    <div style={styles.scoreCard}>
-                                        <span style={{ fontSize: 12, color: '#666' }}>Relevance</span>
-                                        <div style={{ fontSize: 18, fontWeight: 'bold', color: 'green' }}>
-                                            {insightsData.analysis?.relevance_level || 'Calculating...'}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div style={{ background: '#f9f9f9', padding: 15, borderRadius: 8, fontSize: 14 }}>
-                                    <strong>🤖 LLM Analysis:</strong>
-                                    <ul style={{ paddingLeft: 20, marginTop: 5 }}>
-                                        {insightsData.analysis?.strengths?.map((s, i) => <li key={i}>{s}</li>)}
-                                    </ul>
-                                    {insightsData.analysis?.improvement_suggestion && (
-                                        <div style={{ marginTop: 10, color: '#007185' }}>
-                                            💡 <b>Suggestion:</b> {insightsData.analysis.improvement_suggestion}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                        {!insightsData && <div>Loading analysis...</div>}
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
@@ -642,7 +626,6 @@ const styles = {
     queryForm: { flex: 1, display: 'flex', maxWidth: 800, margin: '0 20px' },
     queryInput: { flex: 1, padding: '10px 15px', borderRadius: '4px 0 0 4px', border: 'none', outline: 'none', fontSize: 15 },
     queryBtn: { padding: '0 25px', borderRadius: '0 4px 4px 0', border: 'none', background: '#febd69', cursor: 'pointer', fontWeight: 'bold', color: '#111' },
-    insightsBtn: { padding: '8px 15px', borderRadius: 4, background: '#232f3e', color: 'white', cursor: 'pointer', border: '1px solid #555', fontSize: 13 },
 
     // Filter Chips Bar
     filterChipsBar: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: '8px 20px', background: '#f0f2f5', borderBottom: '1px solid #e7e7e7' },

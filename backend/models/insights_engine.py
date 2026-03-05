@@ -57,56 +57,74 @@ class InsightsEngine:
         rating_data: dict containing rating, filters, query, etc.
         """
         try:
-            # Extract Data
+            # Extract Data — filters may be a JSON string from DB
             filters = rating_data.get("filters", {})
+            if isinstance(filters, str):
+                try:
+                    filters = json.loads(filters)
+                except (json.JSONDecodeError, TypeError):
+                    filters = {}
+            if not isinstance(filters, dict):
+                filters = {}
             
             prompt = self.PROMPT_TEMPLATE.format(
-                scene="Indoor/Neutral", # Mock if missing
-                category=rating_data.get("product_id", "Unknown"), # Or detected_category
-                color=filters.get("color", "N/A"),
+                scene="Indoor/Neutral",
+                category=rating_data.get("product_id", "Unknown"),
+                color=filters.get("color", filters.get("color_name", "N/A")),
                 pattern=filters.get("pattern", "N/A"),
-                sleeve="N/A", # Not always captured
-                scores="[0.35, 0.32, 0.30]", # Mock if backend doesn't track this yet
+                sleeve=filters.get("sleeve", "N/A"),
+                scores="[0.35, 0.32, 0.30]",
                 top_score="0.35",
                 avg_score="0.32",
-                clicked_rank="1", # Assumed top click for now
+                clicked_rank="1",
                 rating=rating_data.get("rating", 3),
                 query=rating_data.get("query", "None")
             )
 
             print("[Insights] 🧠 Generating analysis via LLM...")
             
-            # Call LLM (using Groq ideally for json mode)
-            # We reuse unified_llm's internal method or just call it directly
-            # For simplicity, we assume unified_llm has a method or we use _try_external here
+            # Call Groq directly for insights analysis
+            from models.external_llm import get_groq_llm
+            groq = get_groq_llm()
             
-            result = self.llm._try_external(
-                category="analysis",
-                attributes={},
-                scene=None,
-                user_query=prompt,
-                session_history=[]
+            if not groq._ensure_client():
+                print("[Insights] ⚠️ Groq not available, returning fallback")
+                return self._fallback_result()
+            
+            response = groq.client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {"role": "system", "content": "You are an analytics assistant. Output STRICT JSON only, no markdown."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0,
+                max_tokens=500,
+                response_format={"type": "json_object"},
             )
             
-            # The result from _try_external is usually parsed JSON or dict
-            # If it followed instructions, it should be the JSON we want.
-            # But _try_external expects "filters" output format by default in UnifiedLLM?
-            # actually _try_external uses a generic prompt. 
-            # functionality might differ. 
+            content = response.choices[0].message.content.strip()
+            result = json.loads(content)
             
-            # Let's trust that _try_external returns a dict.
-            # We might need to map it if the structure differs.
+            # Validate expected fields exist
+            if not isinstance(result, dict):
+                return self._fallback_result()
             
             return result
 
         except Exception as e:
             print(f"[Insights] ❌ Analysis failed: {e}")
-            return {
-                "error": str(e),
-                "relevance_level": "Medium",
-                "successful_recommendation": True,
-                "strengths": ["System operational", "User provided feedback"],
-                "weaknesses": ["LLM Analysis failed"],
-                "improvement_suggestion": "Check backend logs",
-                "user_behavior_analysis": "N/A"
-            }
+            return self._fallback_result(str(e))
+    
+    def _fallback_result(self, error=None):
+        """Return a safe fallback when LLM analysis fails."""
+        result = {
+            "relevance_level": "Medium",
+            "successful_recommendation": True,
+            "strengths": ["System operational", "User provided feedback"],
+            "weaknesses": ["LLM analysis unavailable" if error else "No data"],
+            "improvement_suggestion": "Check backend logs for details",
+            "user_behavior_analysis": "N/A"
+        }
+        if error:
+            result["error"] = error
+        return result

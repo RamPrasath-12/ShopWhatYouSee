@@ -458,6 +458,7 @@ const Watch = () => {
                 state: {
                     item: { ...selectedItem, attributes },
                     llmFilters: llmRes.data.filters,
+                    llmPriceMax: llmRes.data.price_max || null,  // Forward price_max
                     embedding: embedding,  // Pass embedding for FAISS search
                     scene: scene,
                     sessionHistory: updatedHistory,  // Pass history for continued refinement
