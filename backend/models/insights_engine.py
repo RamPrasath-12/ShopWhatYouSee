@@ -67,16 +67,31 @@ class InsightsEngine:
             if not isinstance(filters, dict):
                 filters = {}
             
+            # Extract real similarity scores if available
+            sim_scores = rating_data.get("similarity_scores") or filters.get("scores") or "N/A"
+            if isinstance(sim_scores, list):
+                top_score_val = str(round(max(sim_scores), 4)) if sim_scores else "N/A"
+                avg_score_val = str(round(sum(sim_scores) / len(sim_scores), 4)) if sim_scores else "N/A"
+                scores_str = str([round(s, 4) for s in sim_scores[:5]])
+            else:
+                scores_str = str(sim_scores)
+                top_score_val = str(rating_data.get("top_score", filters.get("top_score", "N/A")))
+                avg_score_val = str(rating_data.get("avg_score", filters.get("avg_score", "N/A")))
+            
+            clicked_rank_val = str(rating_data.get("clicked_rank", filters.get("rank", "N/A")))
+            category_val = filters.get("category", rating_data.get("category", rating_data.get("product_id", "Unknown")))
+            scene_val = rating_data.get("scene", filters.get("scene", "Indoor/Neutral"))
+            
             prompt = self.PROMPT_TEMPLATE.format(
-                scene="Indoor/Neutral",
-                category=rating_data.get("product_id", "Unknown"),
+                scene=scene_val,
+                category=category_val,
                 color=filters.get("color", filters.get("color_name", "N/A")),
                 pattern=filters.get("pattern", "N/A"),
                 sleeve=filters.get("sleeve", "N/A"),
-                scores="[0.35, 0.32, 0.30]",
-                top_score="0.35",
-                avg_score="0.32",
-                clicked_rank="1",
+                scores=scores_str,
+                top_score=top_score_val,
+                avg_score=avg_score_val,
+                clicked_rank=clicked_rank_val,
                 rating=rating_data.get("rating", 3),
                 query=rating_data.get("query", "None")
             )

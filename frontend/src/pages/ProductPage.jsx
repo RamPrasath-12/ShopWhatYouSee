@@ -437,24 +437,7 @@ const ProductPage = () => {
 
                 {/* Visual Analysis (Left) */}
                 <div style={styles.visualColumn}>
-                    {/* Visual Match Image (Highlight Top Match) - NOW AT TOP & LARGE */}
-                    {mainProduct && (
-                        <div
-                            style={styles.matchContainer}
-                            onClick={() => setSelectedProduct(mainProduct)}
-                            title="Click to view details"
-                        >
-                            <img
-                                src={mainProduct.image_url}
-                                alt="Match"
-                                onError={(e) => { e.target.onerror = null; e.target.src = "https://via.placeholder.com/400?text=No+Img"; }}
-                                style={styles.matchImage}
-                            />
-                            <div style={styles.matchLabelOverlay}>BEST MATCH</div>
-                        </div>
-                    )}
-
-                    {/* Detected Image - NOW AT BOTTOM & SMALLER */}
+                    {/* Detected Image (User Selection) */}
                     <div style={styles.imageContainer}>
                         <div style={styles.smallLabel}>Your Selection</div>
                         <img
@@ -467,51 +450,22 @@ const ProductPage = () => {
 
                 {/* Product Details (Right - Scrollable) */}
                 <div style={styles.detailsColumn}>
-                    <h1 style={styles.title}>{title}</h1>
 
-                    {/* Rating */}
-                    <div style={styles.ratingBlock}>
-                        {[1, 2, 3, 4, 5].map(star => (
-                            <span key={star} style={{ cursor: 'pointer', fontSize: '20px', color: '#ffa41c', marginRight: 2 }}
-                                onClick={() => axios.post('http://localhost:5000/rating', {
-                                    rating: star, product_id: mainProduct?.product_id, query: userQuery, filters: flattenOverrides(userOverrides).flat
-                                }).then(() => alert(`Rated ${star} ⭐`))}
-                            >⭐</span>
-                        ))}
-                        <span style={{ fontSize: 13, color: '#007185', marginLeft: 8, cursor: 'pointer' }}>1,240 ratings</span>
-                    </div>
 
-                    <div style={styles.priceRow}>
-                        {price != null && <><sup style={{ fontSize: '14px', top: '-0.5em' }}>₹</sup>
-                            <span style={{ fontSize: '28px', fontWeight: '500' }}>{price}</span></>}
-                    </div>
-
-                    <div style={styles.desc}>
-                        <p>• <b>Visual Match:</b> AI matched this item based on color, pattern, and style from your selection.</p>
-                        <p>• <b>Category:</b> {category.charAt(0).toUpperCase() + category.slice(1)}</p>
-                        {attributes?.color_name && <p>• <b>Detected Color:</b> {attributes.color_name}</p>}
-                        {sceneLabel && <p>• <b>Scene:</b> {sceneLabel}</p>}
-                        {mainProduct?.explanation && (
-                            <p style={{ marginTop: 8, color: '#007185', fontStyle: 'italic', fontSize: 13 }}>
-                                💡 {mainProduct.explanation}
-                            </p>
-                        )}
-                    </div>
-
-                    {/* Similar Items */}
-                    {products.length > 1 && (
+                    {/* All Products — Uniform Grid */}
+                    {products.length > 0 && (
                         <div style={styles.similarSection}>
-                            <h3>Similar Options</h3>
+                            <h3>Recommended Products</h3>
                             <div style={styles.similarGrid}>
-                                {products.slice(1).map(prod => (
+                                {products.map((prod, idx) => (
                                     <div
-                                        key={prod.id}
+                                        key={prod.id || idx}
                                         style={styles.similarCard}
                                         onClick={() => {
                                             setSelectedProduct(prod);
                                             trackEvent('product_click', {
                                                 product_id: prod.product_id,
-                                                rank: products.indexOf(prod),
+                                                rank: idx + 1,
                                                 visual_similarity: prod.match_meta?.visual_similarity,
                                                 final_score: prod.final_score,
                                             });

@@ -12,10 +12,11 @@
 # ===============================
 
 YOLO_MODELS = [
-    # "data/yolo/best.pt",                  # Large model 1
-    "data/yolo/yolov8x_best_100 .pt",     # Medium model
-    "data/yolo/best_yolov8m_27.pt",       # Small model 1
-    "data/yolo/detect.pt"                 # Small model 2
+    # Based on exhaustive 18-category benchmark, this is the 
+    # ONLY combination of 3 models that covers 100% of the DB categories.
+    "data/yolo/yolov8x_best_100 .pt",     
+    "data/yolo/best_yolov8m_27.pt",   
+    "data/yolo/detect.pt"    
 ]
 
 # Lower confidence = better recall (important for garments)

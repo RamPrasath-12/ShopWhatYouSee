@@ -53,6 +53,10 @@ IMAGES_DIR = os.path.join(DATA_DIR, 'images')
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
+# Register Admin Dashboard API Blueprint
+from admin.admin_routes import admin_bp
+app.register_blueprint(admin_bp)
+
 # Centralized LLM Manager (Global to persist cache)
 from models.unified_llm import UnifiedLLM
 unified_llm_instance = UnifiedLLM()
@@ -669,15 +673,30 @@ def search_by_image():
 
     # Build query_context for search_products_v2 (new v2 interface)
     # For image search: AG-MAN detection = detected_attributes, user filters = user_filters
+    # CRITICAL: Pass ALL AGMAN-extracted attributes for multi-signal scoring
+    agman_attrs = agman_result.get("attributes", {})
     detected_attributes = {
         "category": detected_category,
+        "color_name": agman_attrs.get("color", {}).get("value") if isinstance(agman_attrs.get("color"), dict) else agman_attrs.get("color"),
+        "color": agman_attrs.get("color", {}).get("value") if isinstance(agman_attrs.get("color"), dict) else agman_attrs.get("color"),
+        "pattern": agman_attrs.get("pattern", {}).get("value") if isinstance(agman_attrs.get("pattern"), dict) else agman_attrs.get("pattern"),
+        "sleeve": agman_attrs.get("sleeve", {}).get("value") if isinstance(agman_attrs.get("sleeve"), dict) else agman_attrs.get("sleeve"),
     }
+    # Remove None values to avoid polluting preserved attributes
+    detected_attributes = {k: v for k, v in detected_attributes.items() if v is not None}
+
+    log_step("SEARCH-BY-IMAGE: AGMAN ATTRIBUTES", {
+        "raw_agman_keys": list(agman_attrs.keys()),
+        "detected_attributes": detected_attributes,
+        "extraction_quality": agman_result.get("extraction_quality", 1.0),
+    })
     
     query_context = {
         "category": filters.get("category", detected_category),
         "embedding": embedding,
         "detected_attributes": detected_attributes,
         "user_filters": {k: v for k, v in filters.items() if v},
+        "extraction_quality": agman_result.get("extraction_quality", 1.0),
     }
 
     t2 = _time.time()

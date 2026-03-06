@@ -99,7 +99,7 @@ RULES FOR "add" vs "remove":
 - If user says nothing about a filter, do NOT include it in either "add" or "remove"
 
 ATTRIBUTE RULES:
-- sleeve_value: Use ONLY allowed values. Map "full sleeve" -> matching allowed value, "half sleeve" -> matching allowed value, etc.
+- sleeve_value: Use ONLY allowed values. Map "full sleeve" -> "Full Sleeves", "half sleeve" -> "Half Sleeves", "short sleeve" -> "Short Sleeves", "sleeveless" -> "Sleeveless", etc.
 - pattern_value: Use ONLY allowed values. Map "striped" -> matching allowed value, "checked" -> matching allowed value, "solid" -> matching allowed value, etc.
 - primary_color_name: Use ONLY allowed values. Map specific colors like "red", "blue", "green", etc. to the exact DB value.
 - color_family: Broader color grouping (e.g. "red" family includes maroon, burgundy, etc.)

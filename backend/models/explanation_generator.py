@@ -152,11 +152,14 @@ _explanation_cache: Dict[tuple, str] = {}
 _CACHE_MAX_SIZE = 500
 
 
-def _cache_key(product_id: str, meta: Dict) -> tuple:
+def _cache_key(product_id: str, meta: Dict, user_filters: Dict = None) -> tuple:
     """
-    Deterministic cache key from product_id + rounded scores + bools.
-    No floats or dicts — only hashable primitives.
+    Deterministic cache key from product_id + rounded scores + bools + user_filters.
+    Includes user_filters so that explanation is regenerated when the user changes
+    constraints (e.g., color blue→red).
     """
+    # Convert user_filters dict to a sorted tuple of (key, value) pairs for hashability
+    filters_key = tuple(sorted((user_filters or {}).items())) if user_filters else ()
     return (
         product_id,
         round(meta.get("visual_similarity", 0.0), 3),
@@ -166,6 +169,7 @@ def _cache_key(product_id: str, meta: Dict) -> tuple:
         meta.get("override_applied", False),
         tuple(sorted(meta.get("relaxed_constraints", []))),
         meta.get("rank_position", 0),
+        filters_key,
     )
 
 
@@ -297,8 +301,8 @@ def generate_explanations(
         meta = prod.get("match_meta", {})
         product_id = prod.get("product_id", "")
 
-        # Check cache first
-        key = _cache_key(product_id, meta)
+        # Check cache first (includes user_filters so filter changes invalidate)
+        key = _cache_key(product_id, meta, user_filters)
         if key in _explanation_cache:
             prod["explanation"] = _explanation_cache[key]
             continue

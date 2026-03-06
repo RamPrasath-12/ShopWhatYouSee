@@ -241,7 +241,7 @@ def normalize_filter_value(value):
 # Color families for partial matching
 COLOR_FAMILIES = {
     "maroon": "red", "burgundy": "red", "wine": "red", "crimson": "red", "rust": "red",
-    "navy blue": "blue", "navy": "blue", "sky blue": "blue", "teal": "blue", "turquoise": "blue", "steel blue": "blue",
+    "navy blue": "blue", "navy": "blue", "sky blue": "blue", "steel blue": "blue",
     "off white": "white", "cream": "white", "ivory": "white", "beige": "white", "nude": "white",
     "charcoal": "black", "dark grey": "grey", "light grey": "grey", "silver": "grey",
     "olive": "green", "lime": "green", "khaki": "green", "sea green": "green",
@@ -545,7 +545,7 @@ def search_products(filters, top_k=50):
     # Map specific shades to broader families
     COLOR_FAMILIES = {
         "maroon": "red", "burgundy": "red", "wine": "red", "crimson": "red", "rust": "red",
-        "navy blue": "blue", "sky blue": "blue", "teal": "blue", "turquoise": "blue", "steel blue": "blue",
+        "navy blue": "blue", "sky blue": "blue", "steel blue": "blue",
         "off white": "white", "cream": "white", "ivory": "white", "beige": "white", "nude": "white",
         "charcoal": "black", "dark grey": "grey", "light grey": "grey", "silver": "grey",
         "olive": "green", "lime": "green", "khaki": "green", "sea green": "green",
@@ -620,11 +620,11 @@ MODE_WEIGHTS = {
 
 # Override strictness defaults
 # HARD = never relax, SOFT = can be relaxed if pool empty
-HARD_OVERRIDE_FIELDS = {"category", "color", "gender"}
-SOFT_OVERRIDE_FIELDS = {"price_bucket", "material", "style", "sleeve", "pattern"}
+HARD_OVERRIDE_FIELDS = {"category", "gender"}
+SOFT_OVERRIDE_FIELDS = {"price_bucket", "color", "material", "style", "sleeve", "pattern"}
 
 # Relaxation order for SOFT overrides only
-RELAX_ORDER = ["price_bucket", "material", "style", "pattern", "sleeve"]
+RELAX_ORDER = ["price_bucket", "material", "style", "pattern", "sleeve", "color"]
 
 
 def _detect_overrides(detected_attributes, user_filters):
@@ -670,44 +670,25 @@ def _detect_overrides(detected_attributes, user_filters):
     
     # --- Color override ---
     if usr_color:
-        usr_color_norm = normalize_filter_value(usr_color)
-        det_color_norm = normalize_filter_value(det_color) if det_color else ""
-        if usr_color_norm != det_color_norm:
-            overrides["color"] = usr_color_norm
-        else:
-            # Same color as detected — it's preserved
-            preserved["color"] = det_color_norm
+        overrides["color"] = normalize_filter_value(usr_color)
     elif det_color:
         preserved["color"] = normalize_filter_value(det_color)
     
     # --- Sleeve override ---
     if usr_sleeve:
-        usr_sleeve_norm = normalize_filter_value(usr_sleeve)
-        det_sleeve_norm = normalize_filter_value(det_sleeve) if det_sleeve else ""
-        if usr_sleeve_norm != det_sleeve_norm:
-            overrides["sleeve"] = usr_sleeve_norm
-        else:
-            preserved["sleeve"] = det_sleeve_norm
+        overrides["sleeve"] = normalize_filter_value(usr_sleeve)
     elif det_sleeve:
         preserved["sleeve"] = normalize_filter_value(det_sleeve)
     
     # --- Pattern override ---
     if usr_pattern:
-        usr_pattern_norm = normalize_filter_value(usr_pattern)
-        det_pattern_norm = normalize_filter_value(det_pattern) if det_pattern else ""
-        if usr_pattern_norm != det_pattern_norm:
-            overrides["pattern"] = usr_pattern_norm
-        else:
-            preserved["pattern"] = det_pattern_norm
+        overrides["pattern"] = normalize_filter_value(usr_pattern)
     elif det_pattern:
         preserved["pattern"] = normalize_filter_value(det_pattern)
     
     # --- Gender override ---
     if usr_gender:
-        usr_gender_norm = normalize_filter_value(usr_gender)
-        det_gender_norm = normalize_filter_value(det_gender) if det_gender else ""
-        if usr_gender_norm != det_gender_norm:
-            overrides["gender"] = usr_gender_norm
+        overrides["gender"] = normalize_filter_value(usr_gender)
     elif det_gender:
         preserved["gender"] = normalize_filter_value(det_gender)
     
@@ -1152,9 +1133,9 @@ def search_products_v2(query_context, top_k=10):
                         field_score = 0.9
                     # Family match (e.g. "green" family includes olive, teal)
                     elif override_family and (override_family == prod_family or override_family in prod_primary):
-                        field_score = 0.5
+                        field_score = 0.05  # Severe penalty for family-only match
                     elif override_val == prod_family or override_val in prod_family:
-                        field_score = 0.5
+                        field_score = 0.05  # Severe penalty for family-only match
                     
                     color_matched = field_score > 0
                 elif field == "sleeve":
@@ -1226,6 +1207,19 @@ def search_products_v2(query_context, top_k=10):
         
         # Final weighted score
         final_score = (w_visual * v_score) + (w_override * o_score) + (w_preserved * p_score)
+        
+        # ── COLOR BOOST HACK ──
+        # Provide a hard absolute boost to final score if color matches exactly/family
+        # This fixes "white dress outranking correctly colored teal dress" by overriding FAISS bias.
+        color_boost_applied = 0.0
+        if color_matched and o_score == 0:
+            # It matched from preserved attributes -> boost it
+            color_boost_applied = 0.35
+            final_score += color_boost_applied
+        elif "color" in override_match_details and override_match_details["color"]:
+            # It matched from explicit user override -> boost it massively
+            color_boost_applied = 0.40
+            final_score += color_boost_applied
         
         prod["similarity_score"] = round(v_score, 4)
         prod["override_score"] = round(o_score, 4)
