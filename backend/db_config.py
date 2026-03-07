@@ -25,14 +25,14 @@ DATABASE_URL = os.getenv(
 # This parses the DSN into host/database/user/password for legacy code
 def _parse_dsn(dsn: str) -> dict:
     """Parse a PostgreSQL DSN into a dict for psycopg2.connect(**config)."""
-    from urllib.parse import urlparse
+    from urllib.parse import urlparse, unquote
     parsed = urlparse(dsn)
     return {
         "host": parsed.hostname or "localhost",
         "port": parsed.port or 5432,
         "database": parsed.path.lstrip("/") or "shopwhatyousee",
         "user": parsed.username or "postgres",
-        "password": parsed.password or "postgres123@",
+        "password": unquote(parsed.password) if parsed.password else "postgres123@",
     }
 
 DB_CONFIG = _parse_dsn(DATABASE_URL)

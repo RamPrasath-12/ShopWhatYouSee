@@ -54,6 +54,21 @@ class UnifiedLLM:
         print(f"  Query: {query}")
         print(f"  Category: {category}")
 
+        # --- Fast Path Bypass for Empty Queries ---
+        # If the user didn't provide any text and there's no chat history to clarify,
+        # calling the LLM is unnecessary and leads to hallucinations (like inventing prices).
+        if not query.strip() and not session_history:
+            print("  [UnifiedLLM] Empty query and no history. Bypassing LLM to prevent hallucinations.")
+            return {
+                "add": {},
+                "remove": [],
+                "reset_to_visual": False,
+                "price_max": None,
+                "reasoning": "No text query provided. Using default visual search.",
+                "confidence": 1.0,
+                "source": "bypass"
+            }
+
         try:
             result = self._get_external_llm().generate_filters(
                 category=category,

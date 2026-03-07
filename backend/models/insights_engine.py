@@ -107,7 +107,7 @@ class InsightsEngine:
                 return self._fallback_result()
             
             response = groq.client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model="llama-3.1-8b-instant",
                 messages=[
                     {"role": "system", "content": "You are an analytics assistant. Output STRICT JSON only, no markdown."},
                     {"role": "user", "content": prompt}

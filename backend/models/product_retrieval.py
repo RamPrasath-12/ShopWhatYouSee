@@ -239,16 +239,62 @@ def normalize_filter_value(value):
 
 
 # Color families for partial matching
+# MUST match the DB color_family values from _add_bucket_family.py:
+#   neutral, red, pink, orange, yellow, green, blue, purple, brown
 COLOR_FAMILIES = {
-    "maroon": "red", "burgundy": "red", "wine": "red", "crimson": "red", "rust": "red",
-    "navy blue": "blue", "navy": "blue", "sky blue": "blue", "steel blue": "blue",
-    "off white": "white", "cream": "white", "ivory": "white", "beige": "white", "nude": "white",
-    "charcoal": "black", "dark grey": "grey", "light grey": "grey", "silver": "grey",
-    "olive": "green", "lime": "green", "khaki": "green", "sea green": "green",
-    "mustard": "yellow", "gold": "yellow",
-    "hot pink": "pink", "magenta": "pink", "peach": "pink", "coral": "pink",
-    "tan": "brown", "chocolate": "brown", "taupe": "brown", "coffee": "brown",
-    "lavender": "purple", "violet": "purple", "mauve": "purple"
+    # Neutral family (black, white, grey, silver, cream, off white, charcoal)
+    "black": "neutral", "white": "neutral", "grey": "neutral",
+    "charcoal": "neutral", "silver": "neutral", "off white": "neutral",
+    "cream": "neutral", "multi": "neutral", "dark grey": "neutral",
+    "light grey": "neutral", "grey melange": "neutral", "steel": "neutral",
+    "ivory": "neutral", "nude": "neutral", "champagne": "neutral",
+    "transparent": "neutral",
+    # Red family
+    "maroon": "red", "burgundy": "red", "wine": "red",
+    "crimson": "red", "rust": "red",
+    # Pink family
+    "hot pink": "pink", "magenta": "pink", "peach": "pink",
+    "coral": "pink", "rose": "pink", "fuchsia": "pink",
+    # Orange family (includes gold, mustard per DB)
+    "mustard": "orange", "gold": "orange",
+    # Yellow family
+    # (Yellow is its own family in DB)
+    # Green family
+    "olive": "green", "lime": "green", "khaki": "green",
+    "sea green": "green", "lime green": "green",
+    "fluorescent green": "green",
+    # Blue family (includes teal, turquoise, navy per DB)
+    "navy blue": "blue", "navy": "blue", "sky blue": "blue",
+    "steel blue": "blue", "teal": "blue", "turquoise blue": "blue",
+    # Purple family
+    "lavender": "purple", "violet": "purple", "mauve": "purple",
+    # Brown family (includes beige, tan, coffee, taupe per DB)
+    "tan": "brown", "chocolate": "brown", "taupe": "brown",
+    "coffee": "brown", "coffee brown": "brown", "camel brown": "brown",
+    "bronze": "brown", "copper": "brown", "rose gold": "brown",
+}
+
+# Scene context → suggested style (Places365 labels → product style)
+SCENE_TO_STYLE = {
+    # Formal / Office
+    "office": "formal", "office_building": "formal", "conference_room": "formal",
+    "boardroom": "formal", "reception": "formal", "lobby": "formal",
+    # Casual / Outdoor
+    "park": "casual", "garden": "casual", "playground": "casual",
+    "picnic_area": "casual", "campsite": "casual", "forest_road": "casual",
+    "bamboo_forest": "casual", "field": "casual", "meadow": "casual",
+    # Sports / Active
+    "gymnasium": "sports", "athletic_field": "sports", "stadium": "sports",
+    "swimming_pool": "sports", "track": "sports", "yoga_studio": "sports",
+    # Beach / Resort
+    "beach": "casual", "coast": "casual", "ocean": "casual",
+    "swimming_pool": "casual", "resort": "casual",
+    # Party / Night
+    "nightclub": "party", "bar": "party", "ballroom": "party",
+    "discotheque": "party", "banquet_hall": "party",
+    # Street
+    "street": "casual", "shopping_mall": "casual", "market": "casual",
+    "downtown": "casual", "alley": "casual",
 }
 
 # Minimum results before relaxation is needed
@@ -790,22 +836,22 @@ def _build_candidate_sql(overrides, preserved, effective_category, detected_gend
             primary, family = _normalize_color_for_sql(value)
             if primary and family:
                 conditions.append(
-                    "(LOWER(primary_color_name) = LOWER(%s) "
+                    "(LOWER(COALESCE(scraped_color, primary_color_name, '')) = LOWER(%s) "
                     "OR LOWER(color_family) = LOWER(%s) "
-                    "OR LOWER(primary_color_name) LIKE LOWER(%s))"
+                    "OR LOWER(COALESCE(scraped_color, primary_color_name, '')) LIKE LOWER(%s))"
                 )
                 params.extend([primary, family, f"%{family}%"])
             elif primary:
-                conditions.append("LOWER(primary_color_name) = LOWER(%s)")
+                conditions.append("LOWER(COALESCE(scraped_color, primary_color_name, '')) = LOWER(%s)")
                 params.append(primary)
         elif field == "sleeve":
-            conditions.append("LOWER(COALESCE(sleeve_value, '')) LIKE LOWER(%s)")
+            conditions.append("LOWER(COALESCE(scraped_sleeve, sleeve_value, '')) LIKE LOWER(%s)")
             params.append(f"%{value}%")
         elif field == "pattern":
-            conditions.append("LOWER(COALESCE(pattern_value, '')) = LOWER(%s)")
+            conditions.append("LOWER(COALESCE(scraped_pattern, pattern_value, '')) = LOWER(%s)")
             params.append(value)
         elif field == "material":
-            conditions.append("LOWER(COALESCE(material, '')) = LOWER(%s)")
+            conditions.append("LOWER(COALESCE(scraped_material, material, '')) = LOWER(%s)")
             params.append(value)
         elif field == "style":
             conditions.append("LOWER(COALESCE(style, '')) = LOWER(%s)")
@@ -883,8 +929,10 @@ def search_products_v2(query_context, top_k=10):
     
     # Scene context (from Places365)
     scene_label = query_context.get("scene")
+    scene_style = None
     if scene_label:
-        print(f"[RetrievalV2] 🎬 Scene: {scene_label}")
+        scene_style = SCENE_TO_STYLE.get(scene_label)
+        print(f"[RetrievalV2] 🎬 Scene: {scene_label}" + (f" → style hint: {scene_style}" if scene_style else ""))
     
     if not effective_category:
         print(f"[RetrievalV2] ❌ No category — returning empty")
@@ -953,11 +1001,15 @@ def search_products_v2(query_context, top_k=10):
                 print(f"[RetrievalV2] ⚠️ Invalid price_max: {price_max}, ignoring")
         
         sql = f"""
-            SELECT product_id, category, gender, style, material,
+            SELECT product_id, category, gender, style,
+                   COALESCE(scraped_material, material) as material,
                    price_bucket, color_family, brand, product_name,
                    image_url, discounted_price, original_price,
-                   primary_color_name, pattern_value, sleeve_value,
-                   embedding, product_url
+                   COALESCE(scraped_color, primary_color_name) as eff_color,
+                   COALESCE(scraped_pattern, pattern_value) as eff_pattern,
+                   COALESCE(scraped_sleeve, sleeve_value) as eff_sleeve,
+                   embedding, product_url,
+                   scraped_fit, scraped_neckline
             FROM visual_attributes
             WHERE {where_clause}
               AND embedding IS NOT NULL
@@ -974,21 +1026,24 @@ def search_products_v2(query_context, top_k=10):
     # First attempt
     rows = fetch_candidates(skip_overrides)
     
-    # Progressive relaxation if empty
-    if len(rows) == 0:
-        for relax_field in RELAX_ORDER:
+    # Progressive relaxation if pool too small (< 5 candidates)
+    MIN_POOL = 5
+    if len(rows) < MIN_POOL:
+        # Relaxation order: relax least-important filters first
+        relax_order = ["pattern", "sleeve", "material", "style", "price_bucket", "color"]
+        hard_fields = {"category"}  # Never relax category
+        for relax_field in relax_order:
             if relax_field not in overrides:
                 continue
-            # Only relax SOFT override fields
-            if relax_field in HARD_OVERRIDE_FIELDS:
+            if relax_field in hard_fields:
                 continue
             
             skip_overrides.add(relax_field)
             relaxation_log.append(f"Relaxed: {relax_field}")
-            print(f"[RetrievalV2] ⚠️ Relaxing: {relax_field}")
+            print(f"[RetrievalV2] ⚠️ Relaxing: {relax_field} (pool was {len(rows)})")
             
             rows = fetch_candidates(skip_overrides)
-            if len(rows) > 0:
+            if len(rows) >= MIN_POOL:
                 print(f"[RetrievalV2] ✅ Found {len(rows)} after relaxing {relax_field}")
                 break
     
@@ -1026,10 +1081,12 @@ def search_products_v2(query_context, top_k=10):
             "name": r[8] or "Product",
             "image_url": r[9] if r[9] and str(r[9]).startswith('http') else f"/images/{r[0]}.jpg",
             "price": float(r[10]) if r[10] else (float(r[11]) if r[11] else 0.0),
-            "color": r[12] or r[6] or "",  # primary_color_name or color_family
-            "pattern": r[13] or "",
-            "sleeve": r[14] or "",
+            "color": r[12] or r[6] or "",  # COALESCE(scraped_color, primary_color_name) or color_family
+            "pattern": r[13] or "",        # COALESCE(scraped_pattern, pattern_value)
+            "sleeve": r[14] or "",         # COALESCE(scraped_sleeve, sleeve_value)
             "product_url": r[16] or "",
+            "fit": r[17] or "",            # scraped_fit
+            "neckline": r[18] or "",       # scraped_neckline
         }
         candidates.append(prod)
         
@@ -1106,7 +1163,7 @@ def search_products_v2(query_context, top_k=10):
         v_score = float(visual_scores[i])
         
         # ── Per-attribute match tracking (for explainability) ──
-        color_matched = False
+        color_match_level = 0  # 0: none, 1: family, 2: exact
         pattern_matched = False
         sleeve_matched = False
         
@@ -1129,15 +1186,17 @@ def search_products_v2(query_context, top_k=10):
                     # Exact match on primary color name
                     if override_val == prod_primary:
                         field_score = 1.0
+                        color_match_level = max(color_match_level, 2)
                     elif override_val in prod_primary:
                         field_score = 0.9
+                        color_match_level = max(color_match_level, 2)
                     # Family match (e.g. "green" family includes olive, teal)
                     elif override_family and (override_family == prod_family or override_family in prod_primary):
                         field_score = 0.05  # Severe penalty for family-only match
+                        color_match_level = max(color_match_level, 1)
                     elif override_val == prod_family or override_val in prod_family:
                         field_score = 0.05  # Severe penalty for family-only match
-                    
-                    color_matched = field_score > 0
+                        color_match_level = max(color_match_level, 1)
                 elif field == "sleeve":
                     prod_sleeve = (prod.get("sleeve") or "").lower().strip()
                     if override_val == prod_sleeve:
@@ -1179,15 +1238,15 @@ def search_products_v2(query_context, top_k=10):
                     prod_color = (prod.get("color") or "").lower()
                     prod_family = (prod.get("color_family") or "").lower()
                     # Check exact match
-                    if pres_val in prod_color or pres_val in prod_family:
+                    if pres_val == prod_color or pres_val in prod_color or pres_val == prod_family:
                         field_matched = True
+                        color_match_level = max(color_match_level, 2)
                     else:
                         # Also check color family match (e.g. navy blue → blue)
                         pres_family = COLOR_FAMILIES.get(pres_val, pres_val)
                         if pres_family == prod_family or pres_family in prod_color:
                             field_matched = True
-                    if not color_matched:  # only set if override didn't already set it
-                        color_matched = field_matched
+                            color_match_level = max(color_match_level, 1)
                 elif field == "sleeve":
                     if pres_val == (prod.get("sleeve") or "").lower():
                         field_matched = True
@@ -1212,14 +1271,24 @@ def search_products_v2(query_context, top_k=10):
         # Provide a hard absolute boost to final score if color matches exactly/family
         # This fixes "white dress outranking correctly colored teal dress" by overriding FAISS bias.
         color_boost_applied = 0.0
-        if color_matched and o_score == 0:
-            # It matched from preserved attributes -> boost it
-            color_boost_applied = 0.35
-            final_score += color_boost_applied
-        elif "color" in override_match_details and override_match_details["color"]:
+        if "color" in override_match_details and override_match_details["color"]:
             # It matched from explicit user override -> boost it massively
-            color_boost_applied = 0.40
+            color_boost_applied = 0.40 if color_match_level == 2 else 0.15
             final_score += color_boost_applied
+        elif color_match_level > 0 and o_score == 0:
+            # It matched from preserved attributes -> boost it
+            color_boost_applied = 0.35 if color_match_level == 2 else 0.10
+            final_score += color_boost_applied
+        
+        # ── SCENE STYLE BOOST ──
+        # If scene context suggests a style (e.g., bamboo_forest → casual),
+        # give a soft boost to products matching that style
+        scene_boost = 0.0
+        if scene_style and "style" not in overrides:
+            prod_style = (prod.get("style") or "").lower().strip()
+            if scene_style.lower() in prod_style:
+                scene_boost = 0.15
+                final_score += scene_boost
         
         prod["similarity_score"] = round(v_score, 4)
         prod["override_score"] = round(o_score, 4)
@@ -1229,7 +1298,7 @@ def search_products_v2(query_context, top_k=10):
         # ── Explanation metadata (grounded, deterministic) ──
         prod["match_meta"] = {
             "visual_similarity": round(v_score, 4),
-            "color_match": color_matched,
+            "color_match": color_match_level > 0,
             "pattern_match": pattern_matched,
             "sleeve_match": sleeve_matched,
             "color_score": round(o_score if "color" in override_match_details else (p_score if "color" in preserved else 0.0), 4),

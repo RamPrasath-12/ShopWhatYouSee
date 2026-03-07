@@ -114,7 +114,7 @@ const ProductPage = () => {
             const initialOverrides = {};
             if (llmFilters && typeof llmFilters === 'object') {
                 for (const [rawKey, val] of Object.entries(llmFilters)) {
-                    if (!val || val === '' || rawKey === 'category') continue; // category handled separately
+                    if (!val || val === '') continue; // don't skip category so it correctly applies to userOverrides
                     const cKey = canonicalize(rawKey);
                     if (cKey === 'price') continue; // price handled via llmPriceMax
                     // Use the most specific value (e.g. primary_color_name "Red" over color_family "red")
@@ -158,7 +158,7 @@ const ProductPage = () => {
             };
 
             // ── Build initial user_overrides from Watch.jsx LLM filters ──
-            const initOverrides = { category: item.class };
+            const initOverrides = { category: llmFilters?.category || item.class };
             if (llmFilters && typeof llmFilters === 'object') {
                 for (const [rawKey, val] of Object.entries(llmFilters)) {
                     if (!val || val === '' || rawKey === 'category') continue;
@@ -542,7 +542,7 @@ const ProductPage = () => {
 
                                 {selectedProduct.final_score && (
                                     <div style={{ marginTop: 20, padding: 12, background: '#f0f2f2', borderRadius: 4, border: '1px solid #e7e7e7', fontSize: 13 }}>
-                                        <b>Visual Match Score:</b> {(selectedProduct.final_score * 100).toFixed(0)}%
+                                        <b>Visual Match Score:</b> {Math.min(100, (selectedProduct.final_score * 100)).toFixed(0)}%
                                         <br />
                                         <span style={{ color: '#565959' }}>Based on deep learning embeddings</span>
                                     </div>
