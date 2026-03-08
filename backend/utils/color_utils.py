@@ -67,6 +67,9 @@ COLOR_DATABASE = {
     "Coffee Brown": {"rgb": (111, 78, 55), "tolerance": 40},
     "Chocolate": {"rgb": (123, 63, 0), "tolerance": 40},
     "Taupe": {"rgb": (72, 60, 50), "tolerance": 35},
+    "Ivory": {"rgb": (255, 255, 240), "tolerance": 20},
+    "Wine": {"rgb": (114, 47, 55), "tolerance": 35},
+    "Fluorescent Green": {"rgb": (0, 255, 0), "tolerance": 60},
 }
 
 def hex_to_rgb(hex_color):
@@ -132,9 +135,9 @@ def hex_to_color_name(hex_color):
             return "Maroon"       # Dark red
         elif 20 <= h < 45:
             return "Coffee Brown" # Dark orange-brown
-        elif 45 <= h < 85:        # Expanded Olive range (was 80)
+        elif 45 <= h < 75:        # Olive range (no overlap with green)
             return "Olive"        # Dark yellow-green
-        elif 80 <= h < 160:       # Green range
+        elif 75 <= h < 160:       # Green range (starts right after olive)
             return "Green"        # Dark green
         elif 160 <= h < 200:
             return "Teal"         # Dark cyan

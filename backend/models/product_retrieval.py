@@ -379,7 +379,7 @@ def search_products(filters, top_k=50):
     def run_query(base_query, params):
         q = f"""
             SELECT id, product_id, product_name, price, brand, base_colour, image_url
-            FROM products
+            FROM visual_attributes
             WHERE {base_query}
         """
         # Price Filter
@@ -477,7 +477,7 @@ def search_products(filters, top_k=50):
         # Remove vector_ids constraint for broader search
         q = f"""
             SELECT id, product_id, product_name, price, brand, base_colour, image_url
-            FROM products
+            FROM visual_attributes
             WHERE LOWER(yolo_category) = LOWER(%s) 
             AND (LOWER(base_colour) LIKE LOWER(%s) OR LOWER(COALESCE(primary_color, '')) LIKE LOWER(%s))
             LIMIT 20
@@ -553,7 +553,7 @@ def search_products(filters, top_k=50):
                 try:
                     q = """
                         SELECT id, product_id, product_name, price, brand, base_colour, image_url
-                        FROM products
+                        FROM visual_attributes
                         WHERE LOWER(yolo_category) = LOWER(%s)
                         LIMIT 20
                     """

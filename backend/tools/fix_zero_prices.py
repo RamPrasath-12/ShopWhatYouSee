@@ -7,6 +7,7 @@ import time
 import re
 import urllib.request
 import json
+import concurrent.futures
 
 DSN = "postgresql://postgres:postgres123%40@localhost:5432/shopwhatyousee"
 
@@ -19,22 +20,18 @@ def scrape_price_from_myntra(product_url):
         with urllib.request.urlopen(req, timeout=10) as resp:
             html = resp.read().decode('utf-8', errors='ignore')
         
-        # Extract pdpData JSON
-        match = re.search(r'pdpData\s*=\s*(\{.*?\});\s*</', html, re.DOTALL)
-        if not match:
-            return None, None
-        
-        data = json.loads(match.group(1))
-        price_info = data.get("price", {})
-        
-        discounted = price_info.get("discounted", 0)
-        mrp = price_info.get("mrp", 0)
-        
-        if discounted > 0 or mrp > 0:
-            return discounted or mrp, mrp or discounted
-        
+        # Extract schema.org JSON-LD price
+        # Looks like: "price" : "370",
+        match = re.search(r'"price"\s*:\s*"([0-9\.]+)"', html)
+        if match:
+            price = float(match.group(1))
+            if price > 0:
+                # We only got 1 price, so we just return it for both discounted and original
+                return price, price
+                
         return None, None
     except Exception as e:
+        print(f"Error fetching {product_url}: {e}")
         return None, None
 
 def main():
@@ -56,24 +53,30 @@ def main():
     fixed = 0
     failed = 0
     
-    for i, (pid, url, cat) in enumerate(rows):
+    def process_row(row):
+        pid, url, cat = row
         disc, orig = scrape_price_from_myntra(url)
+        return pid, disc, orig
         
-        if disc and disc > 0:
-            cur.execute("""
-                UPDATE visual_attributes 
-                SET discounted_price = %s, original_price = %s 
-                WHERE product_id = %s
-            """, (disc, orig, pid))
-            conn.commit()
-            fixed += 1
+    with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
+        futures = {executor.submit(process_row, row): row for row in rows}
+        
+        for i, future in enumerate(concurrent.futures.as_completed(futures)):
+            pid, disc, orig = future.result()
             
-            if (i + 1) % 50 == 0:
+            if disc and disc > 0:
+                cur.execute("""
+                    UPDATE visual_attributes 
+                    SET discounted_price = %s, original_price = %s 
+                    WHERE product_id = %s
+                """, (disc, orig, pid))
+                conn.commit()
+                fixed += 1
+            else:
+                failed += 1
+                
+            if (i + 1) % 50 == 0 or (i + 1) == len(rows):
                 print(f"  [{i+1}/{len(rows)}] Fixed: {fixed} | Failed: {failed}")
-        else:
-            failed += 1
-        
-        time.sleep(0.2)  # Be polite to Myntra
     
     print(f"\n✅ Done! Fixed: {fixed} | Failed: {failed} | Total: {len(rows)}")
     
