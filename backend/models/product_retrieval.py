@@ -475,10 +475,11 @@ def _detect_overrides(detected_attributes, user_filters):
     usr_sleeve = user_filters.get("sleeve") or user_filters.get("sleeve_value", "")
     usr_pattern = user_filters.get("pattern") or user_filters.get("pattern_value", "")
     usr_gender = user_filters.get("gender", "")
-    usr_material = user_filters.get("material", "")
-    usr_style = user_filters.get("style", "")
-    usr_price = user_filters.get("price_bucket", "")
-    usr_fit = user_filters.get("fit", "")
+    usr_material = user_filters.get("material")
+    usr_style = user_filters.get("style")
+    usr_price = user_filters.get("price_bucket")
+    usr_fit = user_filters.get("fit")
+    usr_shade = user_filters.get("shade")
 
     # ✅ FIX: Always normalize category through the mapping table
     if usr_category:
@@ -518,13 +519,15 @@ def _detect_overrides(detected_attributes, user_filters):
         overrides["price_bucket"] = usr_price
     if usr_fit:
         overrides["fit"] = normalize_filter_value(usr_fit)
+    if usr_shade:
+        overrides["shade"] = usr_shade.lower()
 
     if category_changed:
         preserved.pop("category", None)
 
     has_color_override = "color" in overrides
     has_attr_overrides = any(
-        k in overrides for k in ("sleeve", "pattern", "material", "style", "price_bucket", "fit")
+        k in overrides for k in ("sleeve", "pattern", "material", "style", "price_bucket", "fit", "shade")
     )
 
     if category_changed and has_color_override:
@@ -642,6 +645,9 @@ def _build_candidate_sql_with_color_tiers(
             params.append(value)
         elif field == "fit":
             conditions.append("LOWER(COALESCE(scraped_fit, '')) = LOWER(%s)")
+            params.append(value)
+        elif field == "shade":
+            conditions.append("LOWER(COALESCE(scraped_shade, '')) = LOWER(%s)")
             params.append(value)
         elif field == "price_bucket" and "price_bucket" not in skip:
             conditions.append("LOWER(COALESCE(price_bucket, '')) = LOWER(%s)")
@@ -1014,7 +1020,7 @@ def search_products_v3(query_context, top_k=10):
 
     visual_scores = np.zeros(len(candidates), dtype=np.float32)
 
-    if query_embedding and len(embeddings) > 0 and intent != "ATTRIBUTE_FIRST":
+    if query_embedding and len(embeddings) > 0:
         gc.collect()
         q_vec = np.array(query_embedding, dtype=np.float32).reshape(1, -1)
         q_norm = np.linalg.norm(q_vec)

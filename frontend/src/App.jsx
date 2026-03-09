@@ -5,6 +5,7 @@ import Browse from './pages/Browse';
 import Watch from './pages/Watch';
 import ProductPage from './pages/ProductPage';
 import AdminDashboard from './pages/AdminDashboard';
+import UserProfile from './pages/UserProfile';
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
         <Route path="/watch/:id" element={<Watch />} />
         <Route path="/product/:productId" element={<ProductPage />} />
         <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/profile" element={<UserProfile />} />
 
       </Routes>
     </Router>

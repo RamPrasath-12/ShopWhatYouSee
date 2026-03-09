@@ -438,6 +438,12 @@ class UnifiedLLM:
                 filters["material"] = material
                 break
 
+        # Shade keywords
+        if "light" in q or "lighter" in q:
+            filters["shade"] = "light"
+        elif "dark" in q or "darker" in q:
+            filters["shade"] = "dark"
+
         # Price extraction
         price_max = None
         match = re.search(r'(?:under|below|less than|<\s*)\s*(\d+)', q)

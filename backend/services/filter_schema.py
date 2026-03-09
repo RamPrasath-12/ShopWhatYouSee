@@ -55,7 +55,7 @@ PRICE_KEYWORDS = {
 # Fields that retrieval_service accepts as filters
 FILTERABLE_FIELDS = {
     "category", "gender", "style", "material", "price_bucket", "color_family",
-    "sleeve_value", "pattern_value", "primary_color_name",
+    "sleeve_value", "pattern_value", "primary_color_name", "shade"
 }
 
 
@@ -106,6 +106,10 @@ class FilterSchema:
                 
             self.allowed[field] = frozenset(values)
             print(f"  {field}: {len(values)} values")
+
+        # Shade is a specialized field with fixed values (light/dark)
+        self.allowed["shade"] = frozenset(["light", "dark"])
+        print(f"  shade: 2 values")
 
         cur.close()
         conn.close()

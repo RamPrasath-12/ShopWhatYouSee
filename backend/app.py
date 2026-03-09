@@ -915,6 +915,213 @@ def track_event():
     return jsonify({"status": "ok"})
 
 
+# --------------------------------------------------
+# PERSONALIZATION API ROUTES
+# --------------------------------------------------
+
+@app.route("/user", methods=["POST"])
+def create_user_route():
+    """Create or update a user account."""
+    from services.personalization_db import create_user, get_user
+    body = request.get_json() or {}
+    user_id = body.get("user_id")
+    name = body.get("name", "User")
+
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+
+    success = create_user(user_id, name)
+    if success:
+        user = get_user(user_id)
+        return jsonify({"status": "ok", "user": user})
+    return jsonify({"error": "Failed to create user"}), 500
+
+
+@app.route("/user/preferences", methods=["POST", "GET"])
+def user_preferences_route():
+    """Save or get user preferences."""
+    from services.personalization_db import save_preferences, get_preferences, create_user
+
+    if request.method == "GET":
+        user_id = request.args.get("user_id")
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
+        prefs = get_preferences(user_id)
+        return jsonify({"preferences": prefs or {}})
+
+    body = request.get_json() or {}
+    user_id = body.get("user_id")
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+
+    # Auto-create user if not exists
+    create_user(user_id, body.get("name", "User"))
+
+    prefs = {
+        "gender": body.get("gender"),
+        "size": body.get("size"),
+        "budget_min": body.get("budget_min", 0),
+        "budget_max": body.get("budget_max", 99999),
+        "preferred_colors": body.get("preferred_colors", []),
+        "preferred_styles": body.get("preferred_styles", []),
+        "preferred_brands": body.get("preferred_brands", []),
+    }
+    success = save_preferences(user_id, prefs)
+    if success:
+        return jsonify({"status": "ok", "preferences": prefs})
+    return jsonify({"error": "Failed to save preferences"}), 500
+
+
+@app.route("/brands-by-category", methods=["GET"])
+def brands_by_category_route():
+    """Get distinct brands grouped by category from the product database."""
+    import psycopg2
+    from db_config import DB_CONFIG
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT category, brand
+            FROM visual_attributes
+            WHERE brand IS NOT NULL AND brand != ''
+            GROUP BY category, brand
+            ORDER BY category, brand
+        """)
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        brands_map = {}
+        for cat, brand in rows:
+            if cat not in brands_map:
+                brands_map[cat] = []
+            brands_map[cat].append(brand)
+        return jsonify({"brands_by_category": brands_map})
+    except Exception as e:
+        print(f"[BrandsByCategory] Error: {e}")
+        return jsonify({"brands_by_category": {}})
+
+
+@app.route("/purchase", methods=["POST"])
+def purchase_route():
+    """Record a purchase transaction."""
+    from services.personalization_db import save_purchase
+    body = request.get_json() or {}
+    user_id = body.get("user_id")
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+
+    product = {
+        "product_id": body.get("product_id", ""),
+        "category": body.get("category", ""),
+        "price": body.get("price", 0),
+        "color": body.get("color", ""),
+        "pattern": body.get("pattern", ""),
+        "sleeve": body.get("sleeve", ""),
+        "style": body.get("style", ""),
+    }
+
+    success = save_purchase(user_id, product)
+    if success:
+        return jsonify({"status": "ok", "message": "Purchase recorded"})
+    return jsonify({"error": "Failed to record purchase"}), 500
+
+
+@app.route("/recommend", methods=["POST"])
+def recommend_route():
+    """
+    Two-Section Personalized Recommendations
+    ------------------------------------------
+    Returns:
+      similar_items: top-K by visual similarity (same category)
+      personalized_items: top-K by 0.6*preference + 0.4*visual (same + related cats)
+    """
+    from services.personalization_db import get_preferences, get_behavioral_profile
+    from models.personalization_engine import get_visual_recommendations, get_personalized_recommendations
+    from models.explanation_engine import generate_relaxation_explanation
+
+    body = request.get_json() or {}
+    user_id = body.get("user_id")
+    embedding = body.get("embedding")
+    top_k = body.get("top_k", 10)
+    user_overrides = body.get("user_filters", body.get("filters", {}))
+    detected_attrs = body.get("detected_attributes", {})
+    category = body.get("category") or user_overrides.get("category") or detected_attrs.get("category")
+    price_max = body.get("price_max")
+    scene_label = body.get("scene")
+
+    if not embedding:
+        return jsonify({"error": "embedding is required"}), 400
+
+    # Step 1: Retrieve large candidate pool using existing pipeline
+    query_context = {
+        "category": category,
+        "embedding": embedding,
+        "detected_attributes": detected_attrs,
+        "user_filters": user_overrides,
+        "price_max": price_max,
+        "scene": scene_label,
+        "extraction_quality": body.get("extraction_quality", 1.0),
+    }
+
+    t0 = _time.time()
+    result = search_products_v2(query_context, top_k=200)
+    products = result.get("products", []) if isinstance(result, dict) else result
+    metadata = result.get("metadata", {}) if isinstance(result, dict) else {}
+    retrieval_ms = (_time.time() - t0) * 1000
+
+    # Step 2: Section 1 — Visual Recommendations (pure similarity)
+    t1 = _time.time()
+    similar_items = get_visual_recommendations(
+        products, detected_category=category or "", top_k=top_k
+    )
+
+    # Step 3: Section 2 — Personalized Recommendations (preference-weighted)
+    personalized_items = []
+    preferences = None
+    behavioral_profile = None
+    if user_id:
+        preferences = get_preferences(user_id)
+        behavioral_profile = get_behavioral_profile(user_id)
+
+    if preferences:
+        personalized_items = get_personalized_recommendations(
+            products, preferences, behavioral_profile,
+            detected_category=category or "", top_k=top_k
+        )
+
+        # Remove duplicates: don't show in personalized if already in similar
+        similar_ids = {p.get("product_id") for p in similar_items}
+        personalized_items = [
+            p for p in personalized_items
+            if p.get("product_id") not in similar_ids
+        ][:top_k]
+
+    personalization_ms = (_time.time() - t1) * 1000
+
+    # Step 4: Relaxation explanation
+    relaxation_log = metadata.get("relaxation_log", [])
+    relaxation_explanation = generate_relaxation_explanation(
+        relaxation_log, user_overrides, len(similar_items) + len(personalized_items)
+    )
+
+    return jsonify({
+        "similar_items": similar_items,
+        "personalized_items": personalized_items,
+        "relaxation_message": relaxation_explanation,
+        "metadata": {
+            "similar_count": len(similar_items),
+            "personalized_count": len(personalized_items),
+            "retrieval_time_ms": round(retrieval_ms, 1),
+            "personalization_time_ms": round(personalization_ms, 1),
+            "has_user_profile": preferences is not None,
+            "has_purchase_history": behavioral_profile is not None and behavioral_profile.get("purchase_count", 0) > 0,
+            "relaxation_log": relaxation_log,
+            "detected_category": category,
+        }
+    })
+
+
 if __name__ == "__main__":
     import atexit
     atexit.register(analytics_shutdown)  # flush remaining events on exit
@@ -922,6 +1129,13 @@ if __name__ == "__main__":
     # Initialize services at startup
     print("[Startup] Initializing Filter Schema...")
     filter_schema.init()
-    print("SERVER READY -- product_retrieval.py + Filter Schema + Analytics")
+
+    # Initialize personalization tables
+    print("[Startup] Initializing Personalization Tables...")
+    from services.personalization_db import init_personalization_tables
+    init_personalization_tables()
+
+    print("SERVER READY -- product_retrieval.py + Filter Schema + Analytics + Personalization")
     # use_reloader=False prevents double model loading crash
     app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
+

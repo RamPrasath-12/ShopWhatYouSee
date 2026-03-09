@@ -9,7 +9,12 @@ const ProductPage = () => {
     const { item, movie, llmFilters, llmPriceMax, scene, embedding, sessionHistory } = location.state || {};
 
     const [products, setProducts] = useState([]);
+    const [personalizedProducts, setPersonalizedProducts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [relaxationMessage, setRelaxationMessage] = useState(null);
+
+    // Read user_id from localStorage (set by UserProfile page)
+    const userId = localStorage.getItem('swys_user_id') || null;
 
     // ────────────────────────────────────────────────────────
     // 3-LAYER FILTER ARCHITECTURE
@@ -176,25 +181,53 @@ const ProductPage = () => {
             const hasLlmOverrides = Object.keys(initOverrides).length > 1;
             console.log(`[ProductPage] Initial search gen=${gen}${hasLlmOverrides ? ' — WITH Watch.jsx LLM overrides' : ' — PURE_SIMILARITY'}`, { baseline, initOverrides });
 
-            axios.post('http://localhost:5000/search', {
-                detected_category: item.class,
-                embedding: embedding,
-                visual_baseline: baseline,
-                user_overrides: initOverrides,
-                extraction_quality: attributes?.extraction_quality || 1.0,
-                price_max: llmPriceMax || null,
-                scene: scene?.scene_label || null,
-            })
+            // Choose endpoint: /recommend (personalized) or /search (standard)
+            const endpoint = userId ? 'http://localhost:5000/recommend' : 'http://localhost:5000/search';
+            const payload = userId
+                ? {
+                    user_id: userId,
+                    category: initOverrides.category || item.class,
+                    embedding: embedding,
+                    detected_attributes: baseline,
+                    user_filters: initOverrides,
+                    extraction_quality: attributes?.extraction_quality || 1.0,
+                    price_max: llmPriceMax || null,
+                    scene: scene?.scene_label || null,
+                    top_k: 20,
+                }
+                : {
+                    detected_category: item.class,
+                    embedding: embedding,
+                    visual_baseline: baseline,
+                    user_overrides: initOverrides,
+                    extraction_quality: attributes?.extraction_quality || 1.0,
+                    price_max: llmPriceMax || null,
+                    scene: scene?.scene_label || null,
+                };
+
+            axios.post(endpoint, payload)
                 .then(res => {
                     if (searchGenRef.current !== gen) {
                         console.log(`[ProductPage] ❌ Ignoring stale initial search gen=${gen}`);
                         return;
                     }
-                    if (res.data.products && res.data.products.length > 0) {
+                    // Two-section response from /recommend
+                    if (res.data.similar_items) {
+                        setProducts(res.data.similar_items);
+                        setPersonalizedProducts(res.data.personalized_items || []);
+                    } else if (res.data.products && res.data.products.length > 0) {
+                        // Fallback for /search endpoint (no personalization)
                         setProducts(res.data.products);
+                        setPersonalizedProducts([]);
+                    }
+                    // Show relaxation message if filters were broadened
+                    if (res.data.relaxation_message) {
+                        setRelaxationMessage(res.data.relaxation_message);
+                    } else {
+                        setRelaxationMessage(null);
                     }
                     if (res.data.metadata) {
-                        console.log("[ProductPage] V2 Metadata:", res.data.metadata);
+                        console.log("[ProductPage] Metadata:", res.data.metadata);
                     }
                     setLoading(false);
                 })
@@ -432,6 +465,18 @@ const ProductPage = () => {
                 </div>
             )}
 
+            {/* Relaxation Message Banner */}
+            {relaxationMessage && (
+                <div style={styles.relaxationBanner}>
+                    <span style={{ marginRight: 8 }}>ℹ️</span>
+                    {relaxationMessage}
+                    <span
+                        style={{ marginLeft: 'auto', cursor: 'pointer', fontWeight: 700 }}
+                        onClick={() => setRelaxationMessage(null)}
+                    >✕</span>
+                </div>
+            )}
+
             {/* Layout: No Body Scroll, Internal Scroll */}
             <div style={styles.contentArea}>
 
@@ -452,22 +497,23 @@ const ProductPage = () => {
                 <div style={styles.detailsColumn}>
 
 
-                    {/* All Products — Uniform Grid */}
+                    {/* SECTION 1: Similar Items */}
                     {products.length > 0 && (
                         <div style={styles.similarSection}>
-                            <h3>Recommended Products</h3>
+                            <h3>📷 Similar Items</h3>
+                            <p style={{ fontSize: 12, color: '#8899a6', margin: '-8px 0 12px' }}>Visually similar to the detected item</p>
                             <div style={styles.similarGrid}>
                                 {products.map((prod, idx) => (
                                     <div
-                                        key={prod.id || idx}
+                                        key={prod.product_id || idx}
                                         style={styles.similarCard}
                                         onClick={() => {
                                             setSelectedProduct(prod);
                                             trackEvent('product_click', {
                                                 product_id: prod.product_id,
                                                 rank: idx + 1,
-                                                visual_similarity: prod.match_meta?.visual_similarity,
-                                                final_score: prod.final_score,
+                                                section: 'similar',
+                                                visual_similarity: prod.visual_score,
                                             });
                                         }}
                                     >
@@ -480,6 +526,9 @@ const ProductPage = () => {
                                         </div>
                                         <div style={styles.similarName}>{prod.name}</div>
                                         <div style={{ fontWeight: '700', color: '#B12704', fontSize: 13 }}>₹{prod.price}</div>
+                                        {prod.visual_score != null && (
+                                            <div style={{ fontSize: 11, color: '#00a8e1' }}>🎯 {(prod.visual_score * 100).toFixed(0)}% match</div>
+                                        )}
                                         {prod.explanation && (
                                             <>
                                                 <span
@@ -490,17 +539,71 @@ const ProductPage = () => {
                                                             ...prev,
                                                             [prod.product_id]: !prev[prod.product_id]
                                                         }));
-                                                        if (!expandedExpl[prod.product_id]) {
-                                                            trackEvent('explanation_view', {
-                                                                product_id: prod.product_id,
-                                                                explanation_shown: true,
-                                                            });
-                                                        }
                                                     }}
                                                 >
                                                     💡 {expandedExpl[prod.product_id] ? 'Hide' : 'Why?'}
                                                 </span>
                                                 {expandedExpl[prod.product_id] && (
+                                                    <div style={styles.explText}>{prod.explanation}</div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* SECTION 2: Recommended For You */}
+                    {personalizedProducts.length > 0 && (
+                        <div style={{ ...styles.similarSection, marginTop: 30 }}>
+                            <h3>❤️ Recommended For You</h3>
+                            <p style={{ fontSize: 12, color: '#8899a6', margin: '-8px 0 12px' }}>Based on your style preferences</p>
+                            <div style={styles.similarGrid}>
+                                {personalizedProducts.map((prod, idx) => (
+                                    <div
+                                        key={prod.product_id || `p-${idx}`}
+                                        style={{ ...styles.similarCard, borderColor: '#1a3a2a' }}
+                                        onClick={() => {
+                                            setSelectedProduct(prod);
+                                            trackEvent('product_click', {
+                                                product_id: prod.product_id,
+                                                rank: idx + 1,
+                                                section: 'personalized',
+                                                personalized_score: prod.personalized_score,
+                                            });
+                                        }}
+                                    >
+                                        <div style={styles.similarImgWrapper}>
+                                            <img
+                                                src={prod.image_url}
+                                                style={styles.similarImage}
+                                                onError={(e) => { e.target.onerror = null; e.target.src = "https://via.placeholder.com/100?text=No+Img" }}
+                                            />
+                                        </div>
+                                        <div style={styles.similarName}>{prod.name}</div>
+                                        <div style={{ fontWeight: '700', color: '#B12704', fontSize: 13 }}>₹{prod.price}</div>
+                                        {prod.score_breakdown && (
+                                            <div style={{ fontSize: 11, color: '#aab8c2' }}>
+                                                🎯 {(prod.score_breakdown.visual * 100).toFixed(0)}%
+                                                {' '}❤️ {(prod.score_breakdown.preference * 100).toFixed(0)}%
+                                            </div>
+                                        )}
+                                        {prod.explanation && (
+                                            <>
+                                                <span
+                                                    style={styles.whyBtn}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setExpandedExpl(prev => ({
+                                                            ...prev,
+                                                            [`p-${prod.product_id}`]: !prev[`p-${prod.product_id}`]
+                                                        }));
+                                                    }}
+                                                >
+                                                    💡 {expandedExpl[`p-${prod.product_id}`] ? 'Hide' : 'Why?'}
+                                                </span>
+                                                {expandedExpl[`p-${prod.product_id}`] && (
                                                     <div style={styles.explText}>{prod.explanation}</div>
                                                 )}
                                             </>
@@ -540,11 +643,35 @@ const ProductPage = () => {
                                     {selectedProduct.category && <div style={{ marginBottom: 5 }}><b>Category:</b> {selectedProduct.category}</div>}
                                 </div>
 
-                                {selectedProduct.final_score && (
+                                {/* Score Breakdown (personalized or standard) */}
+                                {selectedProduct.score_breakdown ? (
+                                    <div style={{ marginTop: 20, padding: 12, background: '#f0f2f2', borderRadius: 4, border: '1px solid #e7e7e7', fontSize: 13 }}>
+                                        <b>Score Breakdown:</b>
+                                        <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
+                                            <span>🎯 Visual: {(selectedProduct.score_breakdown.visual * 100).toFixed(0)}%</span>
+                                            {selectedProduct.score_breakdown.preference != null && (
+                                                <span>❤️ Preference: {(selectedProduct.score_breakdown.preference * 100).toFixed(0)}%</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : selectedProduct.visual_score != null ? (
+                                    <div style={{ marginTop: 20, padding: 12, background: '#f0f2f2', borderRadius: 4, border: '1px solid #e7e7e7', fontSize: 13 }}>
+                                        <b>Visual Match Score:</b> {Math.min(100, (selectedProduct.visual_score * 100)).toFixed(0)}%
+                                        <br />
+                                        <span style={{ color: '#565959' }}>Based on deep learning embeddings</span>
+                                    </div>
+                                ) : selectedProduct.final_score ? (
                                     <div style={{ marginTop: 20, padding: 12, background: '#f0f2f2', borderRadius: 4, border: '1px solid #e7e7e7', fontSize: 13 }}>
                                         <b>Visual Match Score:</b> {Math.min(100, (selectedProduct.final_score * 100)).toFixed(0)}%
                                         <br />
                                         <span style={{ color: '#565959' }}>Based on deep learning embeddings</span>
+                                    </div>
+                                ) : null}
+
+                                {/* Explanation in modal */}
+                                {selectedProduct.explanation && (
+                                    <div style={{ marginTop: 10, padding: 10, background: '#f0f9ff', borderRadius: 4, border: '1px solid #b3d9f2', fontSize: 13, color: '#0d4f8b', lineHeight: 1.5 }}>
+                                        💡 {selectedProduct.explanation}
                                     </div>
                                 )}
 
@@ -555,8 +682,21 @@ const ProductPage = () => {
                                         trackEvent('buy_click', {
                                             product_id: selectedProduct.product_id,
                                             product_url: url,
-                                            final_score: selectedProduct.final_score,
+                                            final_score: selectedProduct.final_score || selectedProduct.personalized_score,
                                         });
+                                        // Record purchase for personalization
+                                        if (userId) {
+                                            axios.post('http://localhost:5000/purchase', {
+                                                user_id: userId,
+                                                product_id: selectedProduct.product_id,
+                                                category: selectedProduct.category,
+                                                price: selectedProduct.price,
+                                                color: selectedProduct.color,
+                                                pattern: selectedProduct.pattern,
+                                                sleeve: selectedProduct.sleeve,
+                                                style: selectedProduct.style,
+                                            }).catch(() => { });
+                                        }
                                         window.open(url, '_blank');
                                     }}
                                     style={{ marginTop: 20, padding: '10px 20px', background: '#FF3F6C', border: 'none', borderRadius: 20, cursor: 'pointer', fontWeight: 'bold', width: '100%', color: 'white', fontSize: 15 }}
@@ -585,6 +725,9 @@ const styles = {
     filterChipsBar: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: '8px 20px', background: '#f0f2f5', borderBottom: '1px solid #e7e7e7' },
     filterChip: { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', background: '#e3f2fd', borderRadius: 16, fontSize: 12, fontWeight: 500, color: '#1565c0', border: '1px solid #bbdefb' },
     filterChipX: { cursor: 'pointer', fontSize: 14, color: '#c62828', marginLeft: 4, fontWeight: 'bold', lineHeight: 1 },
+
+    // Relaxation message banner
+    relaxationBanner: { display: 'flex', alignItems: 'center', padding: '10px 20px', background: '#fff8e1', borderBottom: '1px solid #ffe082', fontSize: 13, color: '#5d4037', lineHeight: 1.5 },
 
     contentArea: { flex: 1, display: 'flex', overflow: 'hidden', maxWidth: '1400px', margin: '0 auto', width: '100%' },
 

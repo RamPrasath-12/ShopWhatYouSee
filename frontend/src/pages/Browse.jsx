@@ -204,7 +204,13 @@ const Browse = () => {
                     </label>
                     <span style={styles.navIcon}><SearchIcon /></span>
                     <span style={styles.navText}>EN</span>
-                    <span style={styles.navIcon}><UserIcon /></span>
+                    <span style={{ ...styles.navIcon, gap: 6, display: 'flex', alignItems: 'center' }} onClick={() => navigate('/profile')} title="My Profile">
+                        <UserIcon />
+                        {(() => {
+                            const userName = localStorage.getItem('swys_user_name');
+                            return userName ? <span style={{ fontSize: 13, color: '#00a8e1', fontWeight: 600 }}>{userName}</span> : null;
+                        })()}
+                    </span>
                 </div>
             </nav>
 

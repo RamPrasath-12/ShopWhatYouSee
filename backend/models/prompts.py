@@ -82,6 +82,11 @@ SLEEVE AND PATTERN (CRITICAL):
   * "checked" → "checked"
 - These fields are critical for user satisfaction
 
+SHADE (CRITICAL):
+- If user mentions wanting a different shade (e.g. "lighter shade", "dark shade", "light blue", "dark green"):
+  * Output "shade": "light" OR "shade": "dark" in "add"
+- If unsure, OMIT
+
 RESET AND REMOVAL:
 - "show original", "reset" → set "reset_to_visual": true
 - "remove color filter" → put "color_family" and "primary_color_name" in "remove"
@@ -97,6 +102,7 @@ OUTPUT FORMAT (JSON only):
     "material": "<exact value or omit>",
     "color_family": "<exact value or omit>",
     "primary_color_name": "<exact value or omit>",
+    "shade": "<'light' or 'dark' or omit>",
     "sleeve_value": "<exact value or omit>",
     "pattern_value": "<exact value or omit>",
     "price_bucket": "<exact value or omit>"
