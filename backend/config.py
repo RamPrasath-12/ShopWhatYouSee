@@ -15,9 +15,11 @@ YOLO_MODELS = [
     # Based on exhaustive 18-category benchmark, this is the 
     # ONLY combination of 3 models that covers 100% of the DB categories.
     "data/yolo/yolov8x_best_100 .pt",     
-    "data/yolo/best_yolov8m_27.pt",   
-    "data/yolo/detect.pt"
-    # "data/yolo/yolov8l_accessories.pt"    
+    # "data/yolo/best_yolov8m_27.pt",   
+    "data/yolo/detect.pt",
+    # "data/yolo/yolov8l_accessories.pt"
+    "data/yolo/yolov8x_20items_2.pt",
+    "data/yolo/best_me_20items.pt"
 ]
 
 # Lower confidence = better recall (important for garments)

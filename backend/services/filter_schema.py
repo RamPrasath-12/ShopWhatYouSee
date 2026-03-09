@@ -94,8 +94,17 @@ class FilterSchema:
 
         for field, col in field_columns.items():
             cur.execute(f"SELECT DISTINCT {col} FROM visual_attributes WHERE {col} IS NOT NULL")
-            values = frozenset(row[0] for row in cur.fetchall())
-            self.allowed[field] = values
+            values = set(row[0] for row in cur.fetchall())
+            
+            # ✅ FIX: Hardcode the canonical values we teach the LLM in prompts
+            # If the DB currently has 0 products of a certain type, it won't be in the 
+            # SELECT DISTINCT, causing FilterSchema to reject perfectly valid LLM output.
+            if field == "sleeve_value":
+                values.update(["long", "short", "half", "three_quarter", "sleeveless"])
+            elif field == "pattern_value":
+                values.update(["solid", "striped", "checked", "printed", "floral"])
+                
+            self.allowed[field] = frozenset(values)
             print(f"  {field}: {len(values)} values")
 
         cur.close()

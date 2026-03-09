@@ -1,0 +1,8 @@
+{
+  "YOLO Detection": 4038.1,
+  "AGMAN Embedding": 2.7,
+  "Scene Context": 65.0,
+  "LLM Reasoning": 12.3,
+  "Retrieval Engine": null,
+  "Total Pipeline": 4118.1
+}

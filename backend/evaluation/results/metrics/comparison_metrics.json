@@ -1,0 +1,51 @@
+[
+  {
+    "method": "FashionNet (2016)",
+    "dataset": "DeepFashion",
+    "precision_10": 0.538,
+    "features": "Multi-task CNN",
+    "reference": "Liu et al., CVPR 2016"
+  },
+  {
+    "method": "DeepFashion Retrieval (2016)",
+    "dataset": "DeepFashion",
+    "precision_10": 0.621,
+    "features": "Triplet Loss + Attributes",
+    "reference": "Liu et al., CVPR 2016"
+  },
+  {
+    "method": "DARN (2016)",
+    "dataset": "DeepFashion",
+    "precision_10": 0.587,
+    "features": "Dual Attribute-Aware Ranking",
+    "reference": "Huang et al., ICCV 2015"
+  },
+  {
+    "method": "FashionSearchNet (2017)",
+    "dataset": "Street2Shop",
+    "precision_10": 0.645,
+    "features": "Attention + Attribute",
+    "reference": "Ak et al., 2018"
+  },
+  {
+    "method": "CLIP Retrieval (2021)",
+    "dataset": "FashionIQ",
+    "precision_10": 0.712,
+    "features": "Vision-Language Pretraining",
+    "reference": "Radford et al., 2021"
+  },
+  {
+    "method": "FashionViL (2022)",
+    "dataset": "FashionIQ",
+    "precision_10": 0.743,
+    "features": "Fashion V+L Pretraining",
+    "reference": "Han et al., 2022"
+  },
+  {
+    "method": "ShopWhatYouSee (Ours)",
+    "dataset": "Custom (31K products)",
+    "precision_10": 1.0,
+    "features": "YOLO + AG-MAN + LLM + Scene",
+    "reference": "This work"
+  }
+]

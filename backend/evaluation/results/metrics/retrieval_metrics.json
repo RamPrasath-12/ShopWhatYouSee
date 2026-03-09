@@ -1,0 +1,16 @@
+{
+  "Precision@1": 1.0,
+  "Precision@5": 1.0,
+  "Precision@10": 1.0,
+  "Precision@20": 1.0,
+  "Recall@1": 0.0005,
+  "Recall@5": 0.0024,
+  "Recall@10": 0.0048,
+  "Recall@20": 0.0096,
+  "NDCG@1": 1.0,
+  "NDCG@5": 1.0,
+  "NDCG@10": 1.0,
+  "NDCG@20": 1.0,
+  "mAP": 1.0,
+  "num_queries": 25
+}
